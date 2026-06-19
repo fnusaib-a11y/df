@@ -314,6 +314,12 @@ class StarConnectDatabaseService {
         console.warn("Posts sync issue:", err);
       }
 
+      // Seed initial data if Firestore database is unseeded/empty
+      const nonAdminUsers = this.cache.users.filter(u => u.id !== 'user_admin');
+      if (nonAdminUsers.length < 3) {
+        await this.seedInitialDataIfEmpty();
+      }
+
       // Sync Follows
       try {
         for (let i = 0; i < localStorage.length; i++) {
@@ -386,6 +392,8 @@ class StarConnectDatabaseService {
           this.sync();
           window.dispatchEvent(new CustomEvent('starconnect_db_update'));
         }
+      }, (err) => {
+        console.warn("Firestore friend_requests snapshot listener error: ", err);
       });
 
       // Set up real-time snapshot listeners for messages so chat is responsive and fast
@@ -403,6 +411,8 @@ class StarConnectDatabaseService {
           this.sync();
           window.dispatchEvent(new CustomEvent('starconnect_db_update'));
         }
+      }, (err) => {
+        console.warn("Firestore messages snapshot listener error: ", err);
       });
 
       // Set up real-time snapshot listeners for follows to keep following values accurate
@@ -421,6 +431,8 @@ class StarConnectDatabaseService {
         });
         this.sync();
         window.dispatchEvent(new CustomEvent('starconnect_db_update'));
+      }, (err) => {
+        console.warn("Firestore follows snapshot listener error: ", err);
       });
 
       // Set up real-time snapshot listeners for users to get live updates of follow counts/stars/verifications
@@ -439,10 +451,273 @@ class StarConnectDatabaseService {
         });
         this.sync();
         window.dispatchEvent(new CustomEvent('starconnect_db_update'));
+      }, (err) => {
+        console.warn("Firestore users snapshot listener error: ", err);
+      });
+
+      // Set up real-time snapshot listeners for posts to keep feed updated live
+      onSnapshot(collection(this.db, 'posts'), (snapshot) => {
+        snapshot.forEach(doc => {
+          const p = doc.data() as Post;
+          const idx = this.cache.posts.findIndex(item => item.id === p.id);
+          if (idx !== -1) {
+            this.cache.posts[idx] = { ...this.cache.posts[idx], ...p };
+          } else {
+            this.cache.posts.push(p);
+          }
+        });
+        // Keep feed sorted by latest date
+        this.cache.posts.sort((a, b) => new Date(b.createdAt).getTime() - new Date(a.createdAt).getTime());
+        this.sync();
+        window.dispatchEvent(new CustomEvent('starconnect_db_update'));
+      }, (err) => {
+        console.warn("Firestore posts snapshot listener error: ", err);
       });
 
     } catch (err) {
       console.warn("Error running Firestore collections catchup:", err);
+    }
+  }
+
+  private async seedInitialDataIfEmpty() {
+    if (!this.isFirebaseReady || !this.db) return;
+    try {
+      console.log("Seeding beautiful initial Bangladeshi creators and posts to Firestore...");
+      
+      const seedUsers: UserProfile[] = [
+        {
+          id: 'user_rifat',
+          name: 'Rifat Al-Mamun',
+          username: 'rifat',
+          phone: '01712345678',
+          email: 'rifat@starconnect.app',
+          password: 'password123',
+          bio: 'স্বাগতম! আমি রিফাত। এখানে আমার এক্সক্লুসিভ ট্রাভেল ভ্লগ এবং বাংলাদেশের বিভিন্ন জায়গার চমৎকার ল্যান্ডস্কেপ ফটোগ্রাফি পাবেন। 🌊⛰️📸',
+          avatarUrl: 'https://images.unsplash.com/photo-1535713875002-d1d0cf377fde?auto=format&fit=crop&w=150&q=80',
+          coverUrl: 'https://images.unsplash.com/photo-1506744038136-46273834b3fb?auto=format&fit=crop&w=1200&q=80',
+          role: 'creator',
+          isVerified: true,
+          isPremium: true,
+          kycStatus: 'approved',
+          followersCount: 1420,
+          followingCount: 180,
+          postsCount: 2,
+          createdAt: new Date().toISOString(),
+          blockedUsers: [],
+          starBalance: 0,
+          totalStarsEarned: 24500,
+          totalStarsSpent: 0,
+          pendingBalanceStars: 0
+        },
+        {
+          id: 'user_nusrat',
+          name: 'Nusrat Jahan',
+          username: 'nusrat',
+          phone: '01812345678',
+          email: 'nusrat@starconnect.app',
+          password: 'password123',
+          bio: 'ফ্যাশন ও লাইফস্টাইল ইনফ্লুয়েন্সার। এক্সক্লুসিভ স্টাইল টিপস, মেকআপ টিউটোরিয়াল এবং পর্দার পিছনের মেকিং ভিডিও বা ফটো নিয়মিত দেখতে সাবস্ক্রাইব করুন! 💃🌸✨',
+          avatarUrl: 'https://images.unsplash.com/photo-1494790108377-be9c29b29330?auto=format&fit=crop&w=150&q=80',
+          coverUrl: 'https://images.unsplash.com/photo-1512496015851-a90fb38ba796?auto=format&fit=crop&w=1200&q=80',
+          role: 'creator',
+          isVerified: true,
+          isPremium: true,
+          kycStatus: 'approved',
+          followersCount: 3820,
+          followingCount: 220,
+          postsCount: 2,
+          createdAt: new Date().toISOString(),
+          blockedUsers: [],
+          starBalance: 0,
+          totalStarsEarned: 48900,
+          totalStarsSpent: 0,
+          pendingBalanceStars: 0
+        },
+        {
+          id: 'user_ayman_hq',
+          name: 'Dr. Ayman Sadiq',
+          username: 'ayman_hq',
+          phone: '01912345678',
+          email: 'ayman_hq@starconnect.app',
+          password: 'password123',
+          bio: 'নতুন কিছু শিখুন প্রতিদিন। ক্যারিয়ার গাইডলাইন, মেন্টরশিপ ও সফল ক্যারিয়ার গড়ার সেরা টেকনিকগুলো পেতে স্টার দিয়ে প্রিমিয়াম কন্টেন্টগুলো আনলক করুন! 📚🎓💻',
+          avatarUrl: 'https://images.unsplash.com/photo-1560250097-0b93528c311a?auto=format&fit=crop&w=150&q=80',
+          coverUrl: 'https://images.unsplash.com/photo-1516321318423-f06f85e504b3?auto=format&fit=crop&w=1200&q=80',
+          role: 'creator',
+          isVerified: true,
+          isPremium: true,
+          kycStatus: 'approved',
+          followersCount: 9550,
+          followingCount: 310,
+          postsCount: 2,
+          createdAt: new Date().toISOString(),
+          blockedUsers: [],
+          starBalance: 0,
+          totalStarsEarned: 110400,
+          totalStarsSpent: 0,
+          pendingBalanceStars: 0
+        }
+      ];
+
+      const seedPosts: Post[] = [
+        {
+          id: 'seed_post_1',
+          authorId: 'user_rifat',
+          authorName: 'Rifat Al-Mamun',
+          authorAvatarUrl: 'https://images.unsplash.com/photo-1535713875002-d1d0cf377fde?auto=format&fit=crop&w=150&q=80',
+          authorIsVerified: true,
+          title: 'সাজেকের মেঘময় সকাল! 🌄⛰️',
+          content: 'আজকের সূর্যোদয় দেখতে অসাধারণ লাগছিল। মেঘের সমুদ্র যেন চারপাশ ঘিরে আছে। আপনাদের কার সাজেক ভালো লাগে? কমেন্ট করে জানান!',
+          mediaUrl: 'https://images.unsplash.com/photo-1506744038136-46273834b3fb?auto=format&fit=crop&w=800&q=80',
+          mediaType: 'image',
+          category: 'Photography',
+          tags: ['Sajek', 'Travel', 'Photography'],
+          isReel: false,
+          likesCount: 142,
+          commentsCount: 3,
+          sharesCount: 12,
+          likedBy: [],
+          createdAt: new Date(Date.now() - 3600000 * 5).toISOString(),
+          isPremiumPost: false,
+          starPrice: 0,
+          unlockedByUserIds: []
+        },
+        {
+          id: 'seed_post_2',
+          authorId: 'user_rifat',
+          authorName: 'Rifat Al-Mamun',
+          authorAvatarUrl: 'https://images.unsplash.com/photo-1535713875002-d1d0cf377fde?auto=format&fit=crop&w=150&q=80',
+          authorIsVerified: true,
+          title: 'বান্দরবানের নীলগিরি যাওয়ার পথে এক সুন্দর লুকানো ঝর্ণা! 💧🗺️',
+          content: 'এই এক্সক্লুসিভ ঝর্ণার সঠিক লোকেশন এবং নিখুঁত ট্রাভেল গাইড শুধুমাত্র আমার প্রিমিয়াম স্পন্সরদের জন্য। নিচে স্টার বাটন দিয়ে লক কন্টেন্টটি আনলক করুন!',
+          mediaUrl: 'https://images.unsplash.com/photo-1470071459604-3b5ec3a7fe05?auto=format&fit=crop&w=800&q=80',
+          mediaType: 'image',
+          category: 'Premium',
+          tags: ['Waterfall', 'Travel_Guide', 'Premium'],
+          isReel: false,
+          likesCount: 96,
+          commentsCount: 2,
+          sharesCount: 8,
+          likedBy: [],
+          createdAt: new Date(Date.now() - 3600000 * 24).toISOString(),
+          isPremiumPost: true,
+          starPrice: 30,
+          unlockedByUserIds: []
+        },
+        {
+          id: 'seed_post_3',
+          authorId: 'user_nusrat',
+          authorName: 'Nusrat Jahan',
+          authorAvatarUrl: 'https://images.unsplash.com/photo-1494790108377-be9c29b29330?auto=format&fit=crop&w=150&q=80',
+          authorIsVerified: true,
+          title: 'আজকের ট্র্যাডিশনাল লুক কেমন হয়েছে বলুন? 🌸✨',
+          content: 'শাড়ি পরলে বাঙালি মেয়েদের সবসময়ই একটু অন্যরকম লাগে। শাড়িটি নিয়েছি দেশীয় একটি বুটিক হাউজ থেকে। লাইক দিন এবং কমেন্টে জানান কেমন লেগেছে!',
+          mediaUrl: 'https://images.unsplash.com/photo-1494790108377-be9c29b29330?auto=format&fit=crop&w=800&q=80',
+          mediaType: 'image',
+          category: 'Fashion',
+          tags: ['Saree', 'OOTD', 'Traditional'],
+          isReel: false,
+          likesCount: 354,
+          commentsCount: 5,
+          sharesCount: 25,
+          likedBy: [],
+          createdAt: new Date(Date.now() - 3600000 * 2).toISOString(),
+          isPremiumPost: false,
+          starPrice: 0,
+          unlockedByUserIds: []
+        },
+        {
+          id: 'seed_post_4',
+          authorId: 'user_nusrat',
+          authorName: 'Nusrat Jahan',
+          authorAvatarUrl: 'https://images.unsplash.com/photo-1494790108377-be9c29b29330?auto=format&fit=crop&w=150&q=80',
+          authorIsVerified: true,
+          title: 'আমার ব্রাইডাল ফটোশুটের মেকআপ টিউটোরিয়াল (BTS HD) 💄📸',
+          content: 'এই এক্সক্লুসিভ ব্রাইডাল ফটোশুটের মেকআপ টিউটোরিয়াল এবং পর্দার পিছনের ভিডিও শুধুমাত্র আমার প্রিমিয়াম সাবস্ক্রাইবার ও স্টার সাপোর্টারদের জন্য। জলদি আনলক করুন!',
+          mediaUrl: 'https://images.unsplash.com/photo-1512496015851-a90fb38ba796?auto=format&fit=crop&w=800&q=80',
+          mediaType: 'image',
+          category: 'Premium',
+          tags: ['Makeup', 'Bridal', 'Premium'],
+          isReel: false,
+          likesCount: 184,
+          commentsCount: 1,
+          sharesCount: 14,
+          likedBy: [],
+          createdAt: new Date(Date.now() - 3600000 * 18).toISOString(),
+          isPremiumPost: true,
+          starPrice: 50,
+          unlockedByUserIds: []
+        },
+        {
+          id: 'seed_post_5',
+          authorId: 'user_ayman_hq',
+          authorName: 'Dr. Ayman Sadiq',
+          authorAvatarUrl: 'https://images.unsplash.com/photo-1560250097-0b93528c311a?auto=format&fit=crop&w=150&q=80',
+          authorIsVerified: true,
+          title: 'সফল ক্যারিয়ার গড়ার ৩টি সোনালী নিয়ম! 🎯📚',
+          content: '১. নিজের কাজের প্রতি গভীর ভালোবাসা,\n২. প্রতিনিয়ত নতুন টেকনিক ও স্কিল অর্জন,\n৩. স্ট্রং নেটওয়ার্কিং বৃদ্ধি করা।\nআপনার কাছে কোনটি সবচেয়ে গুরুত্বপূর্ণ মনে হয়? নিচে কমেন্ট করুন!',
+          mediaUrl: 'https://images.unsplash.com/photo-1516321318423-f06f85e504b3?auto=format&fit=crop&w=800&q=80',
+          mediaType: 'image',
+          category: 'Education',
+          tags: ['CareerTips', 'SuccessRules', 'Education'],
+          isReel: false,
+          likesCount: 812,
+          commentsCount: 11,
+          sharesCount: 120,
+          likedBy: [],
+          createdAt: new Date(Date.now() - 3600000 * 10).toISOString(),
+          isPremiumPost: false,
+          starPrice: 0,
+          unlockedByUserIds: []
+        },
+        {
+          id: 'seed_post_6',
+          authorId: 'user_ayman_hq',
+          authorName: 'Dr. Ayman Sadiq',
+          authorAvatarUrl: 'https://images.unsplash.com/photo-1560250097-0b93528c311a?auto=format&fit=crop&w=150&q=80',
+          authorIsVerified: true,
+          title: 'ফ্রিল্যান্সিং ও টেক জবে সফল হওয়ার মাস্টার ক্লাস 💻🚀',
+          content: '২০২৬ সালে গ্লোবাল ফ্রিল্যান্সিং ও টেক ইন্ডাস্ট্রির ডিমান্ডগুলো বুঝতে এবং একটি রোডম্যাপ পেতে আমার তৈরি এক্সক্লুসিভ ভিডিও সেশন ও রুলবুক এখনই আনলক করুন!',
+          mediaUrl: 'https://images.unsplash.com/photo-1507537297725-24a1c029d3ca?auto=format&fit=crop&w=800&q=80',
+          mediaType: 'image',
+          category: 'Premium',
+          tags: ['Freelancing', 'Masterclass', 'Premium'],
+          isReel: false,
+          likesCount: 423,
+          commentsCount: 8,
+          sharesCount: 65,
+          likedBy: [],
+          createdAt: new Date(Date.now() - 3600000 * 48).toISOString(),
+          isPremiumPost: true,
+          starPrice: 100,
+          unlockedByUserIds: []
+        }
+      ];
+
+      for (const u of seedUsers) {
+        const idx = this.cache.users.findIndex(x => x.id === u.id);
+        if (idx === -1) {
+          this.cache.users.push(u);
+        } else {
+          this.cache.users[idx] = { ...this.cache.users[idx], ...u };
+        }
+        await setDoc(doc(this.db, 'users', u.id), this.cleanForFirestore(u)).catch(console.warn);
+      }
+
+      for (const p of seedPosts) {
+        const idx = this.cache.posts.findIndex(x => x.id === p.id);
+        if (idx === -1) {
+          this.cache.posts.push(p);
+        } else {
+          this.cache.posts[idx] = { ...this.cache.posts[idx], ...p };
+        }
+        await setDoc(doc(this.db, 'posts', p.id), this.cleanForFirestore(p)).catch(console.warn);
+      }
+
+      this.cache.posts.sort((a, b) => new Date(b.createdAt).getTime() - new Date(a.createdAt).getTime());
+      this.sync();
+    } catch (e) {
+      console.warn("Seeding failed or exception triggered:", e);
     }
   }
 
@@ -631,6 +906,8 @@ class StarConnectDatabaseService {
         const cred = await createUserWithEmailAndPassword(auth, virtualEmail, password);
         if (cred && cred.user) {
           uid = cred.user.uid;
+          this.isFirebaseReady = true;
+          this.firebaseAuthError = null;
           console.log("Firebase Auth account created successfully for", trimmedPhone, uid);
         }
       } catch (authErr: any) {
@@ -761,8 +1038,14 @@ class StarConnectDatabaseService {
       try {
         const auth = getAuth();
         const virtualEmail = `${trimmedPhone}@starconnect.app`;
-        await signInWithEmailAndPassword(auth, virtualEmail, password);
-        console.log("Firebase Auth account authenticated successfully for", trimmedPhone);
+        const cred = await signInWithEmailAndPassword(auth, virtualEmail, password);
+        if (cred && cred.user) {
+          this.isFirebaseReady = true;
+          this.firebaseAuthError = null;
+          console.log("Firebase Auth account authenticated successfully for", trimmedPhone, cred.user.uid);
+          // Pre-sync all data from Firestore right away
+          await this.syncFromFirestore();
+        }
       } catch (authErr: any) {
         console.warn("Firebase email/password login failed or not configured, falling back to local/cached validation:", authErr);
       }
