@@ -1,0 +1,8 @@
+{
+  "name": "Dept File",
+  "description": "A professional modern social media mobile app with Facebook, TikTok, and Messenger style styling featuring a social feed, real-time messaging, short video reels, profiles, follow/friend system, and light/dark theme.",
+  "requestFramePermissions": [],
+  "majorCapabilities": [
+    "MAJOR_CAPABILITY_SERVER_SIDE_GEMINI_API"
+  ]
+}

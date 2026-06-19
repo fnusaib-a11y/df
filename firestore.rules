@@ -1,0 +1,207 @@
+rules_version = '2';
+service cloud.firestore {
+  match /databases/{database}/documents {
+
+    // Global Safety Net
+    match /{document=**} {
+      allow read, write: if false;
+    }
+
+    // --- Primitive Definitions (Hardened Global Helpers) ---
+    function isSignedIn() {
+      return request.auth != null;
+    }
+
+    function incoming() {
+      return request.resource.data;
+    }
+
+    function existing() {
+      return resource.data;
+    }
+
+    function isValidId(id) {
+      return id is string && id.size() <= 128 && id.matches('^[a-zA-Z0-9_\\-]+$');
+    }
+
+    function isAdmin() {
+      return isSignedIn() && (
+        request.auth.uid == 'user_admin' ||
+        (exists(/databases/$(database)/documents/users/$(request.auth.uid)) && get(/databases/$(database)/documents/users/$(request.auth.uid)).data.role == 'admin')
+      );
+    }
+
+    // --- Validation Blueprints (Pillar 2: Standalone Entities) ---
+    function isValidUser(data) {
+      return data.keys().hasAll(['id', 'name', 'phone'])
+        && data.keys().size() >= 3
+        && data.id is string && data.id.size() <= 128
+        && data.name is string && data.name.size() <= 100
+        && data.phone is string && data.phone.size() <= 30;
+    }
+
+    function isValidPost(data) {
+      return data.keys().hasAll(['id', 'authorId', 'authorName', 'content', 'category', 'isReel'])
+        && data.keys().size() >= 6
+        && data.id is string && data.id.size() <= 128
+        && data.authorId is string && data.authorId.size() <= 128
+        && data.authorName is string && data.authorName.size() <= 100
+        && data.content is string && data.content.size() <= 2000
+        && data.category is string && data.category.size() <= 50
+        && data.isReel is bool;
+    }
+
+    function isValidComment(data) {
+      return data.keys().hasAll(['id', 'postId', 'authorId', 'authorName', 'content'])
+        && data.keys().size() >= 5
+        && data.id is string && data.id.size() <= 128
+        && data.postId is string && data.postId.size() <= 128
+        && data.authorId is string && data.authorId.size() <= 128
+        && data.authorName is string && data.authorName.size() <= 100
+        && data.content is string && data.content.size() <= 1000;
+    }
+
+    function isValidMessage(data) {
+      return data.keys().hasAll(['id', 'chatId', 'senderId', 'receiverId', 'content'])
+        && data.keys().size() >= 5
+        && data.id is string && data.id.size() <= 128
+        && data.chatId is string && data.chatId.size() <= 256
+        && data.senderId is string && data.senderId.size() <= 128
+        && data.receiverId is string && data.receiverId.size() <= 128
+        && data.content is string && data.content.size() <= 2000;
+    }
+
+    function isValidFollow(data) {
+      return data.keys().hasAll(['id', 'followerId', 'followingId'])
+        && data.keys().size() >= 3
+        && data.id is string && data.id.size() <= 256
+        && data.followerId is string && data.followerId.size() <= 128
+        && data.followingId is string && data.followingId.size() <= 128;
+    }
+
+    function isValidFriendRequest(data) {
+      return data.keys().hasAll(['id', 'senderId', 'senderName', 'senderAvatarUrl', 'receiverId', 'status', 'createdAt'])
+        && data.keys().size() >= 7
+        && data.id is string && data.id.size() <= 256
+        && data.senderId is string && data.senderId.size() <= 128
+        && data.senderName is string && data.senderName.size() <= 100
+        && data.senderAvatarUrl is string && data.senderAvatarUrl.size() <= 500
+        && data.receiverId is string && data.receiverId.size() <= 128
+        && data.status is string && (data.status == 'pending' || data.status == 'accepted' || data.status == 'rejected')
+        && data.createdAt is string && data.createdAt.size() <= 100;
+    }
+
+    function isValidReport(data) {
+      return data.keys().hasAll(['id', 'reporterId', 'reportedId', 'reportedName', 'reason'])
+        && data.keys().size() >= 5
+        && data.id is string && data.id.size() <= 128
+        && data.reporterId is string && data.reporterId.size() <= 128
+        && data.reportedId is string && data.reportedId.size() <= 128
+        && data.reportedName is string && data.reportedName.size() <= 100
+        && data.reason is string && data.reason.size() <= 1000;
+    }
+
+    // --- Collection Rules ---
+
+    // 1. User Profiles
+    match /users/{userId} {
+      allow get: if isSignedIn() && isValidId(userId);
+      allow list: if isSignedIn() && resource.data.id is string;
+      allow create: if isSignedIn() && isValidId(userId) && userId == request.auth.uid && isValidUser(incoming()) && incoming().role != 'admin';
+      allow update: if isSignedIn() && isValidId(userId) && isValidUser(incoming())
+        && (
+          isAdmin() ||
+          // User updates their own profile
+          (
+            userId == request.auth.uid
+            && incoming().id == existing().id
+            && incoming().role == existing().role
+            && incoming().isVerified == existing().isVerified
+            && incoming().isPremium == existing().isPremium
+            && incoming().diff(existing()).affectedKeys().hasOnly(['name', 'bio', 'avatarUrl', 'coverUrl', 'blockedUsers', 'followersCount', 'followingCount', 'postsCount', 'starBalance', 'totalStarsEarned', 'totalStarsSpent', 'pendingBalanceStars', 'kycStatus', 'kycRealName', 'kycNidOrPassport', 'referralCode', 'referredBy', 'referralsCount', 'totalReferralBonus', 'email', 'password', 'username'])
+          )
+          ||
+          // Non-owners incrementing/decrementing follow properties or referral benefits
+          (
+            incoming().diff(existing()).affectedKeys().hasOnly(['followersCount', 'starBalance', 'totalStarsEarned', 'referralsCount', 'totalReferralBonus'])
+          )
+        );
+      allow delete: if false;
+    }
+
+    // 2. Global Social Posts
+    match /posts/{postId} {
+      allow get: if isSignedIn() && isValidId(postId);
+      allow list: if isSignedIn() && resource.data.authorId is string;
+      allow create: if isSignedIn() && isValidId(postId) && isValidPost(incoming()) && incoming().authorId == request.auth.uid;
+      allow update: if isSignedIn() && isValidId(postId) && isValidPost(incoming())
+        && (
+          isAdmin() ||
+          // Option A: Creator updates content
+          (incoming().authorId == existing().authorId && existing().authorId == request.auth.uid && incoming().diff(existing()).affectedKeys().hasOnly(['content', 'category', 'mediaUrl', 'mediaType', 'isPremiumPost', 'starPrice', 'tags', 'isReel', 'unlockedByUserIds']))
+          ||
+          // Option B: Likes or unlocked counts list modifications
+          incoming().diff(existing()).affectedKeys().hasOnly(['likesCount', 'likedBy', 'unlockedByUserIds'])
+          ||
+          // Option C: commentsCount increment
+          incoming().diff(existing()).affectedKeys().hasOnly(['commentsCount'])
+        );
+      allow delete: if isSignedIn() && isValidId(postId) && (isAdmin() || existing().authorId == request.auth.uid);
+
+      // Comments subcollection
+      match /comments/{commentId} {
+        allow get: if isSignedIn() && isValidId(commentId);
+        allow list: if isSignedIn() && resource.data.authorId is string;
+        allow create: if isSignedIn() && isValidId(commentId) && isValidComment(incoming()) && incoming().authorId == request.auth.uid;
+        allow update: if isSignedIn() && isValidId(commentId) && isValidComment(incoming())
+          && (isAdmin() || (existing().authorId == request.auth.uid && incoming().diff(existing()).affectedKeys().hasOnly(['content'])));
+        allow delete: if isSignedIn() && isValidId(commentId) && (isAdmin() || existing().authorId == request.auth.uid);
+      }
+    }
+
+    // 3. Messages Exchange
+    match /messages/{messageId} {
+      allow get: if isSignedIn() && isValidId(messageId) && (resource.data.senderId == request.auth.uid || resource.data.receiverId == request.auth.uid);
+      allow list: if isSignedIn() && (resource.data.senderId == request.auth.uid || resource.data.receiverId == request.auth.uid);
+      allow create: if isSignedIn() && isValidId(messageId) && isValidMessage(incoming()) && incoming().senderId == request.auth.uid;
+      allow update: if isSignedIn() && isValidId(messageId) && isValidMessage(incoming())
+        && (isAdmin() || (existing().receiverId == request.auth.uid && incoming().diff(existing()).affectedKeys().hasOnly(['isRead'])));
+      allow delete: if isSignedIn() && isAdmin();
+    }
+
+    // 4. Followers Registry
+    match /follows/{followId} {
+      allow get: if isSignedIn() && isValidId(followId);
+      allow list: if isSignedIn() && resource.data.followerId is string;
+      allow create: if isSignedIn() && isValidId(followId) && isValidFollow(incoming()) && incoming().followerId == request.auth.uid;
+      allow update: if false;
+      allow delete: if isSignedIn() && isValidId(followId) && (isAdmin() || existing().followerId == request.auth.uid);
+    }
+
+    // 5. Friend Requests
+    match /friend_requests/{requestId} {
+      allow get: if isSignedIn() && isValidId(requestId);
+      allow list: if isSignedIn() && (resource.data.senderId == request.auth.uid || resource.data.receiverId == request.auth.uid);
+      allow create: if isSignedIn() && isValidId(requestId) && isValidFriendRequest(incoming()) && incoming().senderId == request.auth.uid;
+      allow update: if isSignedIn() && isValidId(requestId) && isValidFriendRequest(incoming())
+        && (
+          isAdmin() ||
+          (
+            (existing().receiverId == request.auth.uid || existing().senderId == request.auth.uid)
+            && incoming().diff(existing()).affectedKeys().hasOnly(['status'])
+          )
+        );
+      allow delete: if isSignedIn() && isValidId(requestId) && (isAdmin() || existing().senderId == request.auth.uid || existing().receiverId == request.auth.uid);
+    }
+
+    // 6. User Reports
+    match /reports/{reportId} {
+      allow get: if isSignedIn() && isValidId(reportId) && (isAdmin() || resource.data.reporterId == request.auth.uid);
+      allow list: if isSignedIn() && (isAdmin() || resource.data.reporterId == request.auth.uid);
+      allow create: if isSignedIn() && isValidId(reportId) && isValidReport(incoming()) && incoming().reporterId == request.auth.uid;
+      allow update: if isSignedIn() && isValidId(reportId) && isValidReport(incoming())
+        && (isAdmin() && incoming().diff(existing()).affectedKeys().hasOnly(['status']));
+      allow delete: if false;
+    }
+  }
+}

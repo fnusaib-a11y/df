@@ -1,0 +1,150 @@
+{
+  "entities": {
+    "User": {
+      "title": "User Profile",
+      "description": "Information about a registered user in Flow",
+      "type": "object",
+      "properties": {
+        "id": { "type": "string" },
+        "name": { "type": "string" },
+        "phone": { "type": "string" },
+        "bio": { "type": "string" },
+        "avatarUrl": { "type": "string" },
+        "coverUrl": { "type": "string" },
+        "isVerified": { "type": "boolean" },
+        "isPremium": { "type": "boolean" },
+        "isAdmin": { "type": "boolean" },
+        "followersCount": { "type": "integer" },
+        "followingCount": { "type": "integer" },
+        "postsCount": { "type": "integer" },
+        "createdAt": { "type": "string" },
+        "blockedUsers": { "type": "array" }
+      },
+      "required": ["id", "name", "phone"]
+    },
+    "Post": {
+      "title": "Post",
+      "description": "Social feed post or reels video in Flow",
+      "type": "object",
+      "properties": {
+        "id": { "type": "string" },
+        "authorId": { "type": "string" },
+        "authorName": { "type": "string" },
+        "authorAvatarUrl": { "type": "string" },
+        "authorIsVerified": { "type": "boolean" },
+        "content": { "type": "string" },
+        "mediaUrl": { "type": "string" },
+        "mediaType": { "type": "string" },
+        "category": { "type": "string" },
+        "isReel": { "type": "boolean" },
+        "likesCount": { "type": "integer" },
+        "commentsCount": { "type": "integer" },
+        "sharesCount": { "type": "integer" },
+        "likedBy": { "type": "array" },
+        "createdAt": { "type": "string" }
+      },
+      "required": ["id", "authorId", "authorName", "content", "category", "isReel"]
+    },
+    "Comment": {
+      "title": "Comment",
+      "description": "Comment on a post",
+      "type": "object",
+      "properties": {
+        "id": { "type": "string" },
+        "postId": { "type": "string" },
+        "authorId": { "type": "string" },
+        "authorName": { "type": "string" },
+        "authorAvatarUrl": { "type": "string" },
+        "content": { "type": "string" },
+        "createdAt": { "type": "string" }
+      },
+      "required": ["id", "postId", "authorId", "authorName", "content"]
+    },
+    "Message": {
+      "title": "Message",
+      "description": "Messenger direct chat message",
+      "type": "object",
+      "properties": {
+        "id": { "type": "string" },
+        "chatId": { "type": "string" },
+        "senderId": { "type": "string" },
+        "receiverId": { "type": "string" },
+        "content": { "type": "string" },
+        "createdAt": { "type": "string" },
+        "isRead": { "type": "boolean" }
+      },
+      "required": ["id", "chatId", "senderId", "receiverId", "content"]
+    },
+    "Follow": {
+      "title": "Follow",
+      "description": "Follow/friend connection between users",
+      "type": "object",
+      "properties": {
+        "id": { "type": "string" },
+        "followerId": { "type": "string" },
+        "followingId": { "type": "string" },
+        "createdAt": { "type": "string" }
+      },
+      "required": ["id", "followerId", "followingId"]
+    },
+    "Report": {
+      "title": "Report",
+      "description": "Report or block filed against user or content",
+      "type": "object",
+      "properties": {
+        "id": { "type": "string" },
+        "reporterId": { "type": "string" },
+        "reportedId": { "type": "string" },
+        "postId": { "type": "string" },
+        "reason": { "type": "string" },
+        "createdAt": { "type": "string" }
+      },
+      "required": ["id", "reporterId", "reportedId", "reason"]
+    },
+    "FriendRequest": {
+      "title": "Friend Request",
+      "description": "Friend request system between users",
+      "type": "object",
+      "properties": {
+        "id": { "type": "string" },
+        "senderId": { "type": "string" },
+        "senderName": { "type": "string" },
+        "senderAvatarUrl": { "type": "string" },
+        "receiverId": { "type": "string" },
+        "status": { "type": "string" },
+        "createdAt": { "type": "string" }
+      },
+      "required": ["id", "senderId", "receiverId", "status", "createdAt"]
+    }
+  },
+  "firestore": {
+    "/users/{userId}": {
+      "schema": "User",
+      "description": "Collection of user profiles indexed by Auth UID"
+    },
+    "/posts/{postId}": {
+      "schema": "Post",
+      "description": "Collection of global social feed posts and short reels"
+    },
+    "/posts/{postId}/comments/{commentId}": {
+      "schema": "Comment",
+      "description": "Subcollection of comments on a specific post"
+    },
+    "/messages/{messageId}": {
+      "schema": "Message",
+      "description": "Collection of messenger chat messages"
+    },
+    "/follows/{followId}": {
+      "schema": "Follow",
+      "description": "Collection tracking user follow relationships"
+    },
+    "/friend_requests/{requestId}": {
+      "schema": "FriendRequest",
+      "description": "Collection of friend requests sent between users"
+    },
+    "/reports/{reportId}": {
+      "schema": "Report",
+      "description": "Collection of reports against user misconduct or objectionable content"
+    }
+  }
+}
