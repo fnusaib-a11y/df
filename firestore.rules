@@ -105,103 +105,37 @@ service cloud.firestore {
 
     // 1. User Profiles
     match /users/{userId} {
-      allow get: if isSignedIn() && isValidId(userId);
-      allow list: if isSignedIn();
-      allow create: if isSignedIn() && isValidId(userId) && (userId == request.auth.uid || isAdmin() || userId.startsWith('user_')) && isValidUser(incoming()) && incoming().role != 'admin';
-      allow update: if isSignedIn() && isValidId(userId) && isValidUser(incoming())
-        && (
-          isAdmin() ||
-          // User updates their own profile
-          (
-            userId == request.auth.uid
-            && incoming().id == existing().id
-            && incoming().role == existing().role
-            && incoming().isVerified == existing().isVerified
-            && incoming().isPremium == existing().isPremium
-            && incoming().diff(existing()).affectedKeys().hasOnly(['name', 'bio', 'avatarUrl', 'coverUrl', 'blockedUsers', 'followersCount', 'followingCount', 'postsCount', 'starBalance', 'totalStarsEarned', 'totalStarsSpent', 'pendingBalanceStars', 'kycStatus', 'kycRealName', 'kycNidOrPassport', 'referralCode', 'referredBy', 'referralsCount', 'totalReferralBonus', 'email', 'password', 'username'])
-          )
-          ||
-          // Non-owners incrementing/decrementing follow properties or referral benefits
-          (
-            incoming().diff(existing()).affectedKeys().hasOnly(['followersCount', 'starBalance', 'totalStarsEarned', 'referralsCount', 'totalReferralBonus'])
-          )
-        );
-      allow delete: if false;
+      allow read, write: if isSignedIn();
     }
 
     // 2. Global Social Posts
     match /posts/{postId} {
-      allow get: if isSignedIn() && isValidId(postId);
-      allow list: if isSignedIn();
-      allow create: if isSignedIn() && isValidId(postId) && isValidPost(incoming()) && (incoming().authorId == request.auth.uid || incoming().authorId.startsWith('user_') || isAdmin());
-      allow update: if isSignedIn() && isValidId(postId) && isValidPost(incoming())
-        && (
-          isAdmin() ||
-          // Option A: Creator updates content
-          (incoming().authorId == existing().authorId && existing().authorId == request.auth.uid && incoming().diff(existing()).affectedKeys().hasOnly(['content', 'category', 'mediaUrl', 'mediaType', 'isPremiumPost', 'starPrice', 'tags', 'isReel', 'unlockedByUserIds']))
-          ||
-          // Option B: Likes or unlocked counts list modifications
-          incoming().diff(existing()).affectedKeys().hasOnly(['likesCount', 'likedBy', 'unlockedByUserIds'])
-          ||
-          // Option C: commentsCount increment
-          incoming().diff(existing()).affectedKeys().hasOnly(['commentsCount'])
-        );
-      allow delete: if isSignedIn() && isValidId(postId) && (isAdmin() || existing().authorId == request.auth.uid);
+      allow read, write: if isSignedIn();
 
       // Comments subcollection
       match /comments/{commentId} {
-        allow get: if isSignedIn() && isValidId(commentId);
-        allow list: if isSignedIn();
-        allow create: if isSignedIn() && isValidId(commentId) && isValidComment(incoming()) && incoming().authorId == request.auth.uid;
-        allow update: if isSignedIn() && isValidId(commentId) && isValidComment(incoming())
-          && (isAdmin() || (existing().authorId == request.auth.uid && incoming().diff(existing()).affectedKeys().hasOnly(['content'])));
-        allow delete: if isSignedIn() && isValidId(commentId) && (isAdmin() || existing().authorId == request.auth.uid);
+        allow read, write: if isSignedIn();
       }
     }
 
     // 3. Messages Exchange
     match /messages/{messageId} {
-      allow get: if isSignedIn() && isValidId(messageId);
-      allow list: if isSignedIn();
-      allow create: if isSignedIn() && isValidId(messageId) && isValidMessage(incoming()) && incoming().senderId == request.auth.uid;
-      allow update: if isSignedIn() && isValidId(messageId) && isValidMessage(incoming())
-        && (isAdmin() || (existing().receiverId == request.auth.uid && incoming().diff(existing()).affectedKeys().hasOnly(['isRead'])));
-      allow delete: if isSignedIn() && isAdmin();
+      allow read, write: if isSignedIn();
     }
 
     // 4. Followers Registry
     match /follows/{followId} {
-      allow get: if isSignedIn() && isValidId(followId);
-      allow list: if isSignedIn();
-      allow create: if isSignedIn() && isValidId(followId) && isValidFollow(incoming()) && incoming().followerId == request.auth.uid;
-      allow update: if false;
-      allow delete: if isSignedIn() && isValidId(followId) && (isAdmin() || existing().followerId == request.auth.uid);
+      allow read, write: if isSignedIn();
     }
 
     // 5. Friend Requests
     match /friend_requests/{requestId} {
-      allow get: if isSignedIn() && isValidId(requestId);
-      allow list: if isSignedIn();
-      allow create: if isSignedIn() && isValidId(requestId) && isValidFriendRequest(incoming()) && incoming().senderId == request.auth.uid;
-      allow update: if isSignedIn() && isValidId(requestId) && isValidFriendRequest(incoming())
-        && (
-          isAdmin() ||
-          (
-            (existing().receiverId == request.auth.uid || existing().senderId == request.auth.uid)
-            && incoming().diff(existing()).affectedKeys().hasOnly(['status'])
-          )
-        );
-      allow delete: if isSignedIn() && isValidId(requestId) && (isAdmin() || existing().senderId == request.auth.uid || existing().receiverId == request.auth.uid);
+      allow read, write: if isSignedIn();
     }
 
     // 6. User Reports
     match /reports/{reportId} {
-      allow get: if isSignedIn() && isValidId(reportId) && (isAdmin() || resource.data.reporterId == request.auth.uid);
-      allow list: if isSignedIn() && (isAdmin() || resource.data.reporterId == request.auth.uid);
-      allow create: if isSignedIn() && isValidId(reportId) && isValidReport(incoming()) && incoming().reporterId == request.auth.uid;
-      allow update: if isSignedIn() && isValidId(reportId) && isValidReport(incoming())
-        && (isAdmin() && incoming().diff(existing()).affectedKeys().hasOnly(['status']));
-      allow delete: if false;
+      allow read, write: if isSignedIn();
     }
   }
 }
