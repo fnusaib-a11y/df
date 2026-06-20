@@ -496,6 +496,7 @@ class StarConnectDatabaseService {
           const u = d.data() as UserProfile;
           const idx = this.cache.users.findIndex(item => item.id === u.id);
           if (idx !== -1) {
+            // Keep the password and other local configurations if remote does not have it
             this.cache.users[idx] = { ...this.cache.users[idx], ...u };
           } else {
             this.cache.users.push(u);
@@ -521,8 +522,9 @@ class StarConnectDatabaseService {
         console.warn("Posts sync issue:", err);
       }
 
-      // Seed initial data if Firestore database is unseeded/empty
-      if (remoteUserCount < 3) {
+      // Seed initial data if Firestore database is completely empty/unseeded
+      // But verify we don't duplicate or overwrite already uploaded posts
+      if (remoteUserCount === 0) {
         await this.seedInitialDataIfEmpty();
       }
 
