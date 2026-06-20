@@ -335,6 +335,7 @@ const BOOTSTRAP_DATA = {
 class StarConnectDatabaseService {
   private cache: typeof BOOTSTRAP_DATA;
   private db: Firestore | null = null;
+  private app: any = null;
   private isFirebaseReady = false;
   public firebaseAuthError: string | null = null;
 
@@ -397,12 +398,18 @@ class StarConnectDatabaseService {
     try {
       if (firebaseConfig && firebaseConfig.projectId) {
         const app = initializeApp(firebaseConfig);
+        this.app = app;
         
         let dbId = (firebaseConfig as any).firestoreDatabaseId;
         // Only use the custom workspace database ID if the loaded project is the default platform sandbox.
         // For custom user projects (like dept-38c4f), use the standard "(default)" database.
-        if (!dbId && firebaseConfig.projectId && firebaseConfig.projectId.startsWith("gen-lang-client-")) {
-          dbId = "ai-studio-5323cef6-5f3f-4344-b8c8-63efded4ec36";
+        if (!dbId && firebaseConfig.projectId) {
+          if (firebaseConfig.projectId.startsWith("gen-lang-client-")) {
+            dbId = "ai-studio-5323cef6-5f3f-4344-b8c8-63efded4ec36";
+          } else if (firebaseConfig.projectId === "dept-2c4b6") {
+            // User's custom project has database ID Literally named 'default' without parentheses
+            dbId = "default";
+          }
         }
         this.db = dbId ? getFirestore(app, dbId) : getFirestore(app);
         
@@ -508,7 +515,16 @@ class StarConnectDatabaseService {
             this.cache.users.push(u);
           }
         });
-      } catch (err) {
+      } catch (err: any) {
+        const errMsg = err && err.message ? String(err.message) : String(err);
+        if (this.app && (errMsg.includes("Database '(default)' not found") || (errMsg.includes("not found") && errMsg.includes("Database")))) {
+          console.warn("Database '(default)' not found error detected. Switching to database ID 'default' and retrying sync...");
+          this.db = getFirestore(this.app, 'default');
+          setTimeout(() => {
+            this.syncFromFirestore();
+          }, 100);
+          return;
+        }
         console.warn("Users sync issue:", err);
       }
 
