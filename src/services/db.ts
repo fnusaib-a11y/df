@@ -489,11 +489,13 @@ class StarConnectDatabaseService {
     try {
       // Sync Users
       let remoteUserCount = 0;
+      const remoteUserIds = new Set<string>();
       try {
         const usersSnap = await getDocs(collection(this.db, 'users'));
         remoteUserCount = usersSnap.size;
         usersSnap.forEach(d => {
           const u = d.data() as UserProfile;
+          remoteUserIds.add(u.id);
           const idx = this.cache.users.findIndex(item => item.id === u.id);
           if (idx !== -1) {
             // Keep the password and other local configurations if remote does not have it
@@ -507,10 +509,12 @@ class StarConnectDatabaseService {
       }
 
       // Sync Posts
+      const remotePostIds = new Set<string>();
       try {
         const postsSnap = await getDocs(collection(this.db, 'posts'));
         postsSnap.forEach(d => {
           const p = d.data() as Post;
+          remotePostIds.add(p.id);
           const idx = this.cache.posts.findIndex(item => item.id === p.id);
           if (idx !== -1) {
             this.cache.posts[idx] = { ...this.cache.posts[idx], ...p };
@@ -520,6 +524,28 @@ class StarConnectDatabaseService {
         });
       } catch (err) {
         console.warn("Posts sync issue:", err);
+      }
+
+      // Upload local-only posts and comments to Firestore so they are visible to others
+      for (const p of this.cache.posts) {
+        if (!remotePostIds.has(p.id)) {
+          console.log("Uploading existing local post to Firestore:", p.id);
+          await setDoc(doc(this.db, 'posts', p.id), this.cleanForFirestore(p)).catch(console.warn);
+          
+          // Also upload any comments associated with this post locally
+          const localComments = this.cache.comments.filter(c => c.postId === p.id);
+          for (const c of localComments) {
+            await setDoc(doc(this.db, 'posts', p.id, 'comments', c.id), this.cleanForFirestore(c)).catch(console.warn);
+          }
+        }
+      }
+
+      // Upload local-only users to Firestore so their profile accounts are successfully synchronized
+      for (const u of this.cache.users) {
+        if (!remoteUserIds.has(u.id)) {
+          console.log("Uploading existing local user to Firestore:", u.id);
+          await setDoc(doc(this.db, 'users', u.id), this.cleanForFirestore(u)).catch(console.warn);
+        }
       }
 
       // Seed initial data if Firestore database is completely empty/unseeded
