@@ -1093,40 +1093,40 @@ export default function FeedView({ onNavigate, onUserSelect, onMessageUser }: Fe
       {/* ----------------------------------------- */}
       {activeCommentsPost && (
         <div 
-          className="absolute inset-0 bg-black/60 backdrop-blur-xs z-50 flex flex-col justify-end"
+          className="absolute inset-0 bg-black/60 backdrop-blur-xs z-50 flex flex-col justify-end sm:justify-center p-0 sm:p-4"
           onClick={() => setActiveCommentsPost(null)}
         >
           <div 
             onClick={(e) => e.stopPropagation()}
-            className="w-full h-[85%] bg-white dark:bg-neutral-900 rounded-t-[32px] border-t border-neutral-100 dark:border-neutral-800 shadow-2xl flex flex-col animate-slideUp overflow-hidden"
+            className="w-full max-w-lg mx-auto h-[85%] sm:h-[750px] sm:max-h-[85vh] bg-white dark:bg-neutral-900 rounded-t-3xl sm:rounded-3xl border border-neutral-200 dark:border-neutral-800 shadow-2xl flex flex-col animate-slideUp overflow-hidden"
           >
-            <div className="px-5 py-4 border-b border-neutral-100 dark:border-neutral-850 flex items-center justify-between">
-              <h3 className="font-extrabold text-slate-800 dark:text-neutral-150 text-xs text-left">Comments ({commentsList.length})</h3>
+            <div className="px-5 py-3.5 border-b border-neutral-100 dark:border-neutral-850 flex items-center justify-between bg-white dark:bg-neutral-900">
+              <h3 className="font-extrabold text-slate-800 dark:text-neutral-150 text-sm text-left">Comments ({commentsList.length})</h3>
               <button
                 onClick={() => setActiveCommentsPost(null)}
-                className="text-xs font-bold text-slate-450 p-2 hover:text-slate-650 transition cursor-pointer"
+                className="text-xs font-bold text-slate-500 hover:text-slate-800 dark:text-neutral-400 dark:hover:text-white p-1.5 transition cursor-pointer"
               >
                 Close ✕
               </button>
             </div>
 
-            <div className="flex-1 overflow-y-auto p-4 space-y-3 bg-slate-50 dark:bg-zinc-950">
+            <div className="flex-1 overflow-y-auto p-4 space-y-3 bg-slate-50 dark:bg-zinc-950 scrollbar-none">
               {commentsList.length === 0 ? (
-                <div className="py-12 text-center text-zinc-450 dark:text-zinc-500 text-xs">No comments found. Be the first to leave a warm comment!</div>
+                <div className="py-12 text-center text-zinc-450 dark:text-zinc-500 text-xs font-medium">No comments found. Be the first to leave a warm comment!</div>
               ) : (
                 commentsList.map(cmt => (
-                  <div key={cmt.id} className="flex gap-2.5 text-left">
+                  <div key={cmt.id} className="flex gap-2.5 text-left items-start">
                     <div className="w-8 h-8 rounded-full overflow-hidden bg-neutral-200 shrink-0">
                       <img src={cmt.authorAvatarUrl} alt="" className="w-full h-full object-cover" />
                     </div>
-                    <div className="flex-1 bg-white dark:bg-neutral-850 rounded-2xl p-3 border border-neutral-100 dark:border-neutral-800">
+                    <div className="flex-1 bg-white dark:bg-neutral-850 rounded-2xl p-3 border border-neutral-100 dark:border-neutral-800 shadow-xs">
                       <div className="flex items-center justify-between mb-1">
                         <span className="text-[11px] font-bold text-slate-800 dark:text-neutral-250">{cmt.authorName}</span>
                         <span className="text-[8.5px] text-zinc-400 font-mono">
                           {new Date(cmt.createdAt).toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' })}
                         </span>
                       </div>
-                      <p className="text-xs text-slate-655 dark:text-neutral-300 leading-relaxed font-sans font-medium">{cmt.content}</p>
+                      <p className="text-xs text-slate-655 dark:text-neutral-300 leading-relaxed font-sans font-medium break-words">{cmt.content}</p>
                     </div>
                   </div>
                 ))
@@ -1140,11 +1140,11 @@ export default function FeedView({ onNavigate, onUserSelect, onMessageUser }: Fe
                 placeholder="Write a beautiful comment..."
                 value={newCommentText}
                 onChange={(e) => setNewCommentText(e.target.value)}
-                className="flex-1 bg-slate-5 w border border-neutral-250 dark:border-neutral-800 text-slate-900 dark:text-neutral-100 placeholder-slate-400 dark:placeholder-zinc-500 rounded-xl px-3.5 py-2.5 text-xs focus:outline-none focus:ring-1 focus:ring-amber-500"
+                className="flex-1 bg-slate-50 dark:bg-neutral-950 border border-neutral-250 dark:border-neutral-800 text-slate-900 dark:text-neutral-100 placeholder-slate-400 dark:placeholder-zinc-500 rounded-xl px-3.5 py-2.5 text-xs focus:outline-none focus:ring-1 focus:ring-amber-500 transition duration-150"
               />
               <button
                 type="submit"
-                className="bg-amber-500 text-white p-2.5 rounded-xl flex items-center justify-center hover:bg-amber-600 shrink-0 cursor-pointer"
+                className="bg-amber-500 text-white p-2.5 rounded-xl flex items-center justify-center hover:bg-amber-600 transition shrink-0 cursor-pointer active:scale-95"
               >
                 <Send className="w-4 h-4" />
               </button>
@@ -1157,15 +1157,21 @@ export default function FeedView({ onNavigate, onUserSelect, onMessageUser }: Fe
       {/* 3. Action Sheet: Gifting direct Stars */}
       {/* ------------------------------------- */}
       {giftingPost && (
-        <div className="absolute inset-0 bg-black/60 backdrop-blur-xs z-55 flex items-end justify-center p-4">
-          <div className="bg-white dark:bg-neutral-900 rounded-[32px] w-full p-6 space-y-4 animate-slideUp shadow-2xl border-t border-neutral-200">
+        <div 
+          className="absolute inset-0 bg-black/60 backdrop-blur-xs z-55 flex items-end sm:items-center justify-center p-0 sm:p-4"
+          onClick={() => setGiftingPost(null)}
+        >
+          <div 
+            onClick={(e) => e.stopPropagation()}
+            className="bg-white dark:bg-neutral-900 rounded-t-3xl sm:rounded-3xl w-full max-w-md p-5 sm:p-6 space-y-4 animate-slideUp shadow-2xl border border-neutral-200 dark:border-neutral-800 text-left"
+          >
             
-            <div className="flex justify-between items-center border-b border-neutral-110 pb-2">
+            <div className="flex justify-between items-center border-b border-neutral-100 dark:border-neutral-800 pb-2.5">
               <div className="flex items-center gap-2">
                 <Gift className="w-5 h-5 text-amber-500 animate-bounce" />
-                <h3 className="text-sm font-extrabold text-slate-800 dark:text-zinc-200 text-left">Send Star Gift to Creator</h3>
+                <h3 className="text-sm font-extrabold text-slate-800 dark:text-zinc-200">Send Star Gift to Creator</h3>
               </div>
-              <button onClick={() => setGiftingPost(null)} className="text-slate-450 hover:text-slate-650 font-bold p-1 text-sm">✕</button>
+              <button onClick={() => setGiftingPost(null)} className="text-slate-400 hover:text-slate-700 dark:hover:text-white font-bold p-1 text-xs">✕ Close</button>
             </div>
 
             {giftingSuccess ? (
@@ -1177,19 +1183,19 @@ export default function FeedView({ onNavigate, onUserSelect, onMessageUser }: Fe
                 <p className="text-[10px] text-zinc-400">Your appreciation motivates our creators!</p>
               </div>
             ) : (
-              <div className="space-y-4 text-left">
+              <div className="space-y-4">
                 <div className="p-3 bg-neutral-50 dark:bg-zinc-950 border border-neutral-150 dark:border-neutral-850 rounded-xl flex items-center gap-3">
                   <div className="w-9 h-9 rounded-full overflow-hidden bg-white border shrink-0">
                     <img src={giftingPost.authorAvatarUrl} alt="" className="w-full h-full object-cover" />
                   </div>
-                  <div>
-                    <span className="text-xs font-black text-slate-800 dark:text-zinc-200 block">Recipient: {giftingPost.authorName}</span>
+                  <div className="min-w-0 flex-1">
+                    <span className="text-xs font-black text-slate-800 dark:text-zinc-200 block truncate">Recipient: {giftingPost.authorName}</span>
                     <span className="text-[10px] text-zinc-400 block font-mono truncate">Post Title: {giftingPost.title || 'Creator Post'}</span>
                   </div>
                 </div>
 
                 {giftingError && (
-                  <div className="bg-rose-50 border border-rose-100 p-3 rounded-xl text-rose-600 text-xs flex flex-col gap-2 items-start justify-start">
+                  <div className="bg-rose-55 border border-rose-100 dark:border-rose-950/50 dark:bg-rose-950/20 p-3 rounded-xl text-rose-600 dark:text-rose-400 text-xs flex flex-col gap-2 items-start justify-start">
                     <div className="flex gap-1 items-center">
                       <AlertCircle className="w-4 h-4 text-rose-500 shrink-0" />
                       <span>{giftingError}</span>
@@ -1218,13 +1224,13 @@ export default function FeedView({ onNavigate, onUserSelect, onMessageUser }: Fe
                 <div className="space-y-1.5">
                   <label className="text-[10px] font-black text-zinc-400 block uppercase pl-1 animate-pulse">Select Gift Amount</label>
                   
-                  <div className="grid grid-cols-4 gap-2">
+                  <div className="grid grid-cols-4 gap-1.5 sm:gap-2">
                     {[10, 50, 100, 200].map((amt) => (
                       <button
                         key={amt}
                         type="button"
                         onClick={() => setGiftAmount(amt)}
-                        className={`py-3.5 rounded-xl text-center text-xs font-black transition cursor-pointer font-mono border ${
+                        className={`py-2.5 sm:py-3.5 rounded-xl text-center text-xs font-black transition cursor-pointer font-mono border ${
                           giftAmount === amt
                             ? 'border-amber-500 bg-amber-50/20 text-amber-600 font-extrabold dark:bg-amber-955/20'
                             : 'border-neutral-200 dark:border-neutral-800 bg-white dark:bg-neutral-900 text-zinc-450 dark:text-zinc-400'
@@ -1237,7 +1243,7 @@ export default function FeedView({ onNavigate, onUserSelect, onMessageUser }: Fe
                 </div>
 
                 <div className="p-3 bg-amber-500/10 rounded-xl flex justify-between select-none items-center text-xs border border-amber-500/25">
-                  <span className="text-amber-700 font-bold">Your Wallet Balance:</span>
+                  <span className="text-amber-750 dark:text-amber-300 font-bold">Your Wallet Balance:</span>
                   <span className="font-extrabold text-amber-800 dark:text-amber-400 font-mono">⭐ {myProfile.starBalance} Stars</span>
                 </div>
 

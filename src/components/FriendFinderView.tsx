@@ -254,18 +254,10 @@ export default function FriendFinderView({ onBack, onNavigate, onChatWithUser }:
           )}
 
           {/* Registered Users Section - Fulfilled directly from DB */}
-          <div id="registered_users_container" className="border-t-8 border-neutral-100 dark:border-neutral-900 mt-6 pt-4 pb-3 px-4 flex flex-col gap-1">
-            <div className="flex justify-between items-center">
-              <h2 className="text-xl font-bold text-neutral-900 dark:text-white flex items-center gap-2">
-                👥 এপে যারা সাইনআপ করেছে ({users.length})
-              </h2>
-              <span className="text-[11px] bg-blue-50 text-blue-600 dark:bg-blue-950/40 dark:text-blue-300 px-2.5 py-1 rounded-full font-bold">
-                সব ব্যবহারকারী (All Users)
-              </span>
-            </div>
-            <p className="text-xs text-neutral-500 dark:text-neutral-400">
-              এখান থেকে আপনি এপে সাইনআপ করা সবার তালিকা দেখতে পাচ্ছেন এবং সরাসরি বন্ধু বানাতে পারবেন।
-            </p>
+          <div id="registered_users_container" className="border-t-8 border-neutral-100 dark:border-neutral-900 mt-6 pt-4 pb-2 px-4">
+            <h2 className="text-lg font-bold text-neutral-900 dark:text-white">
+              All Members ({users.length})
+            </h2>
           </div>
 
           <div id="registered_users_list" className="divide-y divide-neutral-100 dark:divide-neutral-900 px-1 mb-2">
