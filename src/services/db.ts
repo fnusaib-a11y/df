@@ -488,8 +488,10 @@ class StarConnectDatabaseService {
     if (!this.isFirebaseReady || !this.db) return;
     try {
       // Sync Users
+      let remoteUserCount = 0;
       try {
         const usersSnap = await getDocs(collection(this.db, 'users'));
+        remoteUserCount = usersSnap.size;
         usersSnap.forEach(d => {
           const u = d.data() as UserProfile;
           const idx = this.cache.users.findIndex(item => item.id === u.id);
@@ -520,8 +522,7 @@ class StarConnectDatabaseService {
       }
 
       // Seed initial data if Firestore database is unseeded/empty
-      const nonAdminUsers = this.cache.users.filter(u => u.id !== 'user_admin');
-      if (nonAdminUsers.length < 3) {
+      if (remoteUserCount < 3) {
         await this.seedInitialDataIfEmpty();
       }
 
