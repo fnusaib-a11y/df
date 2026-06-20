@@ -132,8 +132,18 @@ export default function AuthView({ onLoginSuccess }: AuthViewProps) {
         )}
 
         {dbService.getAuthError() && (
-          <div className="p-3 bg-amber-500/10 border border-amber-500/20 text-amber-700 dark:text-amber-400 text-[10px] rounded-2xl mb-4 leading-relaxed pr-3 pl-4">
-            💡 <strong>ফায়ারবেস সতর্কতা:</strong> আপনার ফায়ারবেস প্রোজেক্টে (Anonymous Auth) নিষ্ক্রিয় আছে। স্থায়ীভাবে ডাটা ক্লাউডে সেভ করতে চাইলে দয়া করে আপনার <strong>Firebase Console ➜ Authentication ➜ Sign-in method</strong> থেকে <strong>Anonymous</strong> সাইন-ইন প্রভাইডারটি চালু (Enable) করে রাখুন।
+          <div className="p-3 bg-amber-500/10 border border-amber-500/20 text-amber-700 dark:text-amber-400 text-[11px] rounded-2xl mb-4 leading-relaxed pr-3 pl-4">
+            💡 <strong>ফায়ারবেস ক্লাউড কানেকশন অফলাইন:</strong> আপনি এবং আপনার বন্ধুরা যাতে ফেসবুকে যেভাবে একাধিক ডিভাইস থেকে পোস্ট ও রিয়েল-টাইম চ্যাট করেন সেভাবে স্টারকানেক্ট সোশ্যাল কানেক্টিভিটি ব্যবহার করতে পারেন, সেজন্য আপনার ফায়ারবেস প্রজেক্টে <strong>Anonymous (অজ্ঞাতনামা)</strong> এবং <strong>Email/Password (ইমেইল/পাসওয়ার্ড)</strong> সাইন-ইন মেথড দুটো চালু করা আবশ্যক।
+            <br />
+            <a 
+              href="https://console.firebase.google.com/project/project-6628b134-ee05-438f-9e5/authentication/providers" 
+              target="_blank" 
+              rel="noopener noreferrer" 
+              className="inline-block mt-2 font-bold underline text-amber-600 dark:text-amber-400 hover:text-amber-700"
+            >
+              👉 এখানে ক্লিক করে ফায়ারবেস প্রজেক্ট সেটিংস থেকে মেথড দুইটি চালু করুন 👈
+            </a>
+            <p className="mt-1 text-[9px] opacity-75">ত্রুটি কোড: {dbService.getAuthError()}</p>
           </div>
         )}
 

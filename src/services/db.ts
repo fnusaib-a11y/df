@@ -1840,6 +1840,11 @@ class StarConnectDatabaseService {
 
     this.cache.posts[idx] = { ...post };
     this.sync();
+
+    if (this.isFirebaseReady && this.db) {
+      setDoc(doc(this.db, 'posts', postId), this.cleanForFirestore(post)).catch(console.warn);
+    }
+
     return post;
   }
 
@@ -1918,6 +1923,10 @@ class StarConnectDatabaseService {
 
     post.unlockedByUserIds.push(me.id);
     this.sync();
+
+    if (this.isFirebaseReady && this.db) {
+      setDoc(doc(this.db, 'posts', postId), this.cleanForFirestore(post)).catch(console.warn);
+    }
     
     window.dispatchEvent(new CustomEvent('starconnect_db_update'));
     return { success: true };
@@ -2373,6 +2382,10 @@ class StarConnectDatabaseService {
       this.cache.currentUser = { ...user };
     }
     this.sync();
+
+    if (this.isFirebaseReady && this.db) {
+      setDoc(doc(this.db, 'users', user.id), this.cleanForFirestore(user)).catch(console.warn);
+    }
   }
 
   private addTransaction(userId: string, type: TransactionItem['type'], amountStars: number, amountBDT?: number, refId?: string, refName?: string) {
