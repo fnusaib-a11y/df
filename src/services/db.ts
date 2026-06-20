@@ -546,6 +546,32 @@ class StarConnectDatabaseService {
         console.warn("Posts sync issue:", err);
       }
 
+      // Sync Stories
+      const remoteStoryIds = new Set<string>();
+      try {
+        const storiesSnap = await getDocs(collection(this.db, 'stories'));
+        storiesSnap.forEach(d => {
+          const s = d.data() as Story;
+          remoteStoryIds.add(s.id);
+          const idx = this.cache.stories.findIndex(item => item.id === s.id);
+          if (idx !== -1) {
+            this.cache.stories[idx] = { ...this.cache.stories[idx], ...s };
+          } else {
+            this.cache.stories.push(s);
+          }
+        });
+      } catch (err) {
+        console.warn("Stories sync issue:", err);
+      }
+
+      // Upload local-only stories
+      for (const s of this.cache.stories) {
+        if (!remoteStoryIds.has(s.id)) {
+          console.log("Uploading existing local story to Firestore:", s.id);
+          await setDoc(doc(this.db, 'stories', s.id), this.cleanForFirestore(s)).catch(console.warn);
+        }
+      }
+
       // Upload local-only posts and comments to Firestore so they are visible to others
       for (const p of this.cache.posts) {
         if (!remotePostIds.has(p.id)) {
@@ -726,6 +752,23 @@ class StarConnectDatabaseService {
         window.dispatchEvent(new CustomEvent('starconnect_db_update'));
       }, (err) => {
         console.warn("Firestore posts snapshot listener error: ", err);
+      });
+
+      // Set up real-time snapshot listeners for stories to keep stories updated live
+      onSnapshot(collection(this.db, 'stories'), (snapshot) => {
+        snapshot.forEach(doc => {
+          const s = doc.data() as Story;
+          const idx = this.cache.stories.findIndex(item => item.id === s.id);
+          if (idx !== -1) {
+            this.cache.stories[idx] = { ...this.cache.stories[idx], ...s };
+          } else {
+            this.cache.stories.push(s);
+          }
+        });
+        this.sync();
+        window.dispatchEvent(new CustomEvent('starconnect_db_update'));
+      }, (err) => {
+        console.warn("Firestore stories snapshot listener error: ", err);
       });
 
     } catch (err) {
@@ -2425,6 +2468,10 @@ class StarConnectDatabaseService {
   }
 
   public addNotification(userId: string, senderId: string, senderName: string, senderAvatarUrl: string, type: NotificationItem['type'], text: string, postId?: string) {
+    // ONLY accept notifications from the admin panel (senderId === 'user_admin')
+    if (senderId !== 'user_admin') {
+      return;
+    }
     const notif: NotificationItem = {
       id: 'notif_' + Math.random().toString(36).substr(2, 9),
       userId,
@@ -2441,8 +2488,36 @@ class StarConnectDatabaseService {
     this.sync();
   }
 
+  public sendAdminCustomNotification(targetUserId: string | 'all', text: string) {
+    const adminAvatar = 'https://images.unsplash.com/photo-1535713875002-d1d0cf377fde?auto=format&fit=crop&w=150&q=80';
+    if (targetUserId === 'all') {
+      const activeUsers = this.getUsers();
+      activeUsers.forEach(user => {
+        this.addNotification(
+          user.id,
+          'user_admin',
+          'StarConnect Admin',
+          adminAvatar,
+          'kyc_update',
+          text
+        );
+      });
+    } else {
+      this.addNotification(
+        targetUserId,
+        'user_admin',
+        'StarConnect Admin',
+        adminAvatar,
+        'kyc_update',
+        text
+      );
+    }
+  }
+
   getNotifications(): NotificationItem[] {
-    return this.cache.notifications;
+    const me = this.getCurrentUser();
+    // Return only active user's notifications which are sent by user_admin
+    return this.cache.notifications.filter(n => n.userId === me.id && n.senderId === 'user_admin');
   }
 
   markAllNotificationsRead() {
@@ -2468,6 +2543,10 @@ class StarConnectDatabaseService {
     };
     this.cache.stories.push(story);
     this.sync();
+    
+    if (this.isFirebaseReady && this.db) {
+      setDoc(doc(this.db, 'stories', story.id), this.cleanForFirestore(story)).catch(console.warn);
+    }
     return story;
   }
 
@@ -2478,6 +2557,10 @@ class StarConnectDatabaseService {
       if (!story.viewedBy.includes(viewerId)) {
         story.viewedBy.push(viewerId);
         this.sync();
+        
+        if (this.isFirebaseReady && this.db) {
+          setDoc(doc(this.db, 'stories', storyId), this.cleanForFirestore(story)).catch(console.warn);
+        }
         window.dispatchEvent(new CustomEvent('starconnect_db_update'));
       }
     }
@@ -2493,6 +2576,10 @@ class StarConnectDatabaseService {
         story.reacts[userId] = reaction;
       }
       this.sync();
+      
+      if (this.isFirebaseReady && this.db) {
+        setDoc(doc(this.db, 'stories', storyId), this.cleanForFirestore(story)).catch(console.warn);
+      }
       window.dispatchEvent(new CustomEvent('starconnect_db_update'));
     }
   }
@@ -2511,10 +2598,28 @@ class StarConnectDatabaseService {
       };
       story.comments.push(newComment);
       this.sync();
+      
+      if (this.isFirebaseReady && this.db) {
+        setDoc(doc(this.db, 'stories', storyId), this.cleanForFirestore(story)).catch(console.warn);
+      }
       window.dispatchEvent(new CustomEvent('starconnect_db_update'));
       return newComment;
     }
     return null;
+  }
+
+  updatePostMetrics(postId: string, likesCount: number, commentsCount: number) {
+    const post = this.cache.posts.find(p => p.id === postId);
+    if (post) {
+      post.likesCount = likesCount;
+      post.commentsCount = commentsCount;
+      this.sync();
+      
+      if (this.isFirebaseReady && this.db) {
+        setDoc(doc(this.db, 'posts', post.id), this.cleanForFirestore(post)).catch(console.warn);
+      }
+      window.dispatchEvent(new CustomEvent('starconnect_db_update'));
+    }
   }
 
   deletePost(postId: string) {

@@ -119,6 +119,7 @@ export default function App() {
             onPostSelect={(post) => {
               setCurrentScreen(AppScreen.FEED);
             }}
+            onChatWithUser={navigateToMessageUser}
           />
         );
       case AppScreen.SETTINGS:

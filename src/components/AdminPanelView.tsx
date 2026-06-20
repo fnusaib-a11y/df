@@ -4,7 +4,7 @@
  */
 
 import React from 'react';
-import { ArrowLeft, Shield, AlertTriangle, CheckCircle, Trash2, UserX, Award, Coins, FileCheck, Landmark } from 'lucide-react';
+import { ArrowLeft, Shield, AlertTriangle, CheckCircle, Trash2, UserX, Award, Coins, FileCheck, Landmark, Bell, Heart, Sparkles } from 'lucide-react';
 import { dbService } from '../services/db';
 import { Report, Post, UserProfile, WithdrawalRequest, TransactionItem } from '../types';
 import { VerifiedBadge } from './VerifiedBadge';
@@ -13,7 +13,7 @@ interface AdminPanelViewProps {
   onBack: () => void;
 }
 
-type AdminTab = 'kyc' | 'withdrawals' | 'reports' | 'users' | 'referrals' | 'verification';
+type AdminTab = 'kyc' | 'withdrawals' | 'reports' | 'users' | 'referrals' | 'verification' | 'notifications' | 'booster';
 
 export default function AdminPanelView({ onBack }: AdminPanelViewProps) {
   const [activeTab, setActiveTab] = React.useState<AdminTab>('kyc');
@@ -33,6 +33,10 @@ export default function AdminPanelView({ onBack }: AdminPanelViewProps) {
     isAutoReferEnabled: true,
     minReferralsForAutoVerify: 30
   });
+
+  // Admin Custom Notification Composer states
+  const [notifTargetUserId, setNotifTargetUserId] = React.useState<string>('all');
+  const [notifText, setNotifText] = React.useState<string>('');
 
   const loadAdminData = () => {
     setReports(dbService.getReports());
@@ -209,7 +213,7 @@ export default function AdminPanelView({ onBack }: AdminPanelViewProps) {
         </div>
 
         {/* Tab Selection Row */}
-        <div className="grid grid-cols-3 gap-1.5 bg-white dark:bg-zinc-900 p-1.5 rounded-2xl border border-neutral-200 dark:border-neutral-800">
+        <div className="grid grid-cols-4 gap-1.5 bg-white dark:bg-zinc-900 p-1.5 rounded-2xl border border-neutral-200 dark:border-neutral-800">
           <button
             onClick={() => setActiveTab('kyc')}
             className={`py-2 rounded-xl text-[10px] font-black transition text-center flex flex-col items-center gap-1 cursor-pointer ${
@@ -283,11 +287,35 @@ export default function AdminPanelView({ onBack }: AdminPanelViewProps) {
             className={`py-2 rounded-xl text-[10px] font-black transition text-center flex flex-col items-center gap-1 cursor-pointer ${
               activeTab === 'verification'
                 ? 'bg-indigo-650 text-white font-extrabold shadow-sm'
-                : 'text-zinc-500 hover:bg-neutral-800 dark:hover:bg-neutral-850'
+                : 'text-zinc-500 hover:bg-neutral-850 dark:hover:bg-neutral-800'
             }`}
           >
             <VerifiedBadge className="w-4 h-4 shrink-0" />
             <span>Verify Rules</span>
+          </button>
+
+          <button
+            onClick={() => setActiveTab('notifications')}
+            className={`py-2 rounded-xl text-[10px] font-black transition text-center flex flex-col items-center gap-1 cursor-pointer ${
+              activeTab === 'notifications'
+                ? 'bg-indigo-650 text-white font-extrabold shadow-sm'
+                : 'text-zinc-500 hover:bg-neutral-850 dark:hover:bg-neutral-800'
+            }`}
+          >
+            <Bell className="w-4 h-4 shrink-0" />
+            <span>Notifications</span>
+          </button>
+
+          <button
+            onClick={() => setActiveTab('booster')}
+            className={`py-2 rounded-xl text-[10px] font-black transition text-center flex flex-col items-center gap-1 cursor-pointer ${
+              activeTab === 'booster'
+                ? 'bg-indigo-650 text-white font-extrabold shadow-sm'
+                : 'text-zinc-500 hover:bg-neutral-850 dark:hover:bg-neutral-800'
+            }`}
+          >
+            <Sparkles className="w-4 h-4 text-amber-500 shrink-0" />
+            <span>Booster</span>
           </button>
         </div>
 
@@ -809,8 +837,161 @@ export default function AdminPanelView({ onBack }: AdminPanelViewProps) {
             </div>
           )}
 
+          {/* Tab G: Custom Administrative Notifications Board */}
+          {activeTab === 'notifications' && (
+            <div className="space-y-4 text-left">
+              <div className="bg-white dark:bg-neutral-900 border border-neutral-150 dark:border-neutral-850 rounded-[24px] p-5.5 shadow-sm space-y-4">
+                <div className="flex items-center gap-2 pb-2 border-b border-neutral-100 dark:border-neutral-800">
+                  <Bell className="w-5 h-5 text-indigo-650" />
+                  <div>
+                    <h3 className="text-sm font-black text-slate-800 dark:text-zinc-200">Send Admin Notifications</h3>
+                    <p className="text-[10px] text-zinc-400 mt-0.5">Admin-created notices are instantly delivered to users' notifications center.</p>
+                  </div>
+                </div>
+
+                {/* Recipient Selection */}
+                <div className="space-y-1.5">
+                  <label className="text-[11px] font-black text-slate-700 dark:text-neutral-300 uppercase tracking-wide">
+                    Recipient User
+                  </label>
+                  <select
+                    value={notifTargetUserId}
+                    onChange={(e) => setNotifTargetUserId(e.target.value)}
+                    className="w-full border border-neutral-200 dark:border-neutral-800 rounded-xl px-3 py-2.5 text-xs bg-white dark:bg-zinc-950 focus:outline-none text-slate-850 dark:text-neutral-200 font-bold"
+                  >
+                    <option value="all" className="font-extrabold text-indigo-600">📢 ── Broadcast to All Members ──</option>
+                    {allUsers.map((user) => (
+                      <option key={user.id} value={user.id}>
+                        👤 {user.name} (@{user.username})
+                      </option>
+                    ))}
+                  </select>
+                </div>
+
+                {/* Notification Message Field */}
+                <div className="space-y-1.5">
+                  <label className="text-[11px] font-black text-slate-700 dark:text-neutral-300 uppercase tracking-wide">
+                    Notification Message
+                  </label>
+                  <textarea
+                    rows={4}
+                    placeholder="Type the customized push notification message here..."
+                    value={notifText}
+                    onChange={(e) => setNotifText(e.target.value)}
+                    className="w-full border border-neutral-200 dark:border-neutral-800 rounded-xl px-3.5 py-3 text-xs bg-white dark:bg-zinc-950 focus:outline-none text-slate-850 dark:text-neutral-200 placeholder-slate-400 focus:ring-1 focus:ring-indigo-500 font-medium"
+                  />
+                </div>
+
+                {/* Submit Action Button */}
+                <button
+                  onClick={() => {
+                    if (!notifText.trim()) {
+                      alert('Please specify the message content to broadcast!');
+                      return;
+                    }
+                    dbService.sendAdminCustomNotification(notifTargetUserId, notifText.trim());
+                    alert('Broadcast notification successfully sent! 🚀👑');
+                    setNotifText('');
+                  }}
+                  className="w-full py-3 rounded-xl bg-indigo-650 hover:bg-indigo-700 text-white text-xs font-extrabold shadow-md hover:shadow-lg transition flex items-center justify-center gap-1.5 cursor-pointer"
+                >
+                  <Bell className="w-4 h-4" />
+                  <span>Deliver Notice Now</span>
+                </button>
+              </div>
+            </div>
+          )}
+
+          {/* Tab H: Likes and Comments Booster Control */}
+          {activeTab === 'booster' && (
+            <div className="space-y-4 text-left">
+              <div className="bg-white dark:bg-neutral-900 border border-neutral-150 dark:border-neutral-850 rounded-[24px] p-5.5 shadow-sm space-y-4">
+                <div className="flex items-center gap-2 pb-2 border-b border-neutral-100 dark:border-neutral-850">
+                  <Sparkles className="w-5 h-5 text-indigo-650 animate-pulse" />
+                  <div>
+                    <h3 className="text-sm font-black text-slate-800 dark:text-zinc-200">সুপার পোস্ট বুস্টার (Post Likers & Comments Adjuster)</h3>
+                    <p className="text-[10px] text-zinc-400 mt-0.5">এডমিন প্যানেল থেকে যেকোনো ক্রিয়েটরের পোস্টের লাইক এবং কমেন্ট সংখ্যা গোপনে নিয়ন্ত্রণ করুন।</p>
+                  </div>
+                </div>
+
+                <div className="space-y-4 divide-y divide-neutral-100 dark:divide-neutral-850/60">
+                  {dbService.getPosts('সব').length === 0 ? (
+                    <p className="text-xs text-zinc-400 text-center py-6">কোনো পোস্ট পাওয়া যায়নি।</p>
+                  ) : (
+                    dbService.getPosts('সব').map((post) => (
+                      <PostBoosterCard key={post.id} post={post} />
+                    ))
+                  )}
+                </div>
+              </div>
+            </div>
+          )}
+
         </div>
 
+      </div>
+    </div>
+  );
+}
+
+function PostBoosterCard({ post }: { post: Post; key?: string }) {
+  const [likes, setLikes] = React.useState(post.likesCount);
+  const [comments, setComments] = React.useState(post.commentsCount);
+  const [isUpdating, setIsUpdating] = React.useState(false);
+
+  const handleUpdate = () => {
+    setIsUpdating(true);
+    dbService.updatePostMetrics(post.id, likes, comments);
+    setTimeout(() => {
+      setIsUpdating(false);
+      alert('সফলভাবে পোস্টের লাইক ও কমেন্ট সংখ্যা পরিবর্তন করা হয়েছে! 🚀🎯');
+    }, 450);
+  };
+
+  return (
+    <div className="py-4 flex flex-col sm:flex-row gap-4 items-start sm:items-center justify-between">
+      <div className="flex gap-3 items-center">
+        {post.mediaUrl ? (
+          <img src={post.mediaUrl} alt="" className="w-12 h-12 object-cover rounded-xl border border-neutral-150 dark:border-neutral-800" />
+        ) : (
+          <div className="w-12 h-12 bg-indigo-50 dark:bg-indigo-950 flex items-center justify-center text-[10px] text-indigo-500 rounded-xl font-black">POST</div>
+        )}
+        <div className="min-w-0">
+          <p className="text-xs font-black text-slate-800 dark:text-neutral-200 truncate max-w-[200px]">{post.title || post.content || 'Untitled post'}</p>
+          <p className="text-[10px] text-zinc-400 mt-0.5">ক্রিয়েটর: <span className="font-bold text-amber-600">{post.authorName}</span></p>
+        </div>
+      </div>
+
+      <div className="flex flex-wrap items-center gap-2.5">
+        <div className="flex items-center gap-1 bg-neutral-50 dark:bg-zinc-950 border border-neutral-150 dark:border-neutral-800 rounded-lg px-2 py-1">
+          <Heart className="w-3.5 h-3.5 text-rose-500 fill-rose-500 shrink-0" />
+          <input
+            type="number"
+            value={likes}
+            onChange={(e) => setLikes(Math.max(0, parseInt(e.target.value) || 0))}
+            className="w-12 text-center text-xs font-black bg-transparent border-none focus:outline-none text-slate-800 dark:text-neutral-100"
+            title="লাইক সংখ্যা"
+          />
+        </div>
+
+        <div className="flex items-center gap-1 bg-neutral-50 dark:bg-zinc-950 border border-neutral-150 dark:border-neutral-800 rounded-lg px-2 py-1">
+          <span className="text-xs shrink-0">💬</span>
+          <input
+            type="number"
+            value={comments}
+            onChange={(e) => setComments(Math.max(0, parseInt(e.target.value) || 0))}
+            className="w-12 text-center text-xs font-black bg-transparent border-none focus:outline-none text-slate-800 dark:text-neutral-100"
+            title="কমেন্ট সংখ্যা"
+          />
+        </div>
+
+        <button
+          onClick={handleUpdate}
+          disabled={isUpdating}
+          className="text-[11px] font-black px-3 py-1.5 bg-indigo-650 hover:bg-indigo-700 text-white rounded-lg transition active:scale-95 duration-100 cursor-pointer disabled:opacity-50"
+        >
+          {isUpdating ? 'আপডেট...' : 'হালনাগাদ'}
+        </button>
       </div>
     </div>
   );
