@@ -397,7 +397,7 @@ class StarConnectDatabaseService {
         let dbId = (firebaseConfig as any).firestoreDatabaseId;
         // Only use the custom workspace database ID if the loaded project is the default platform sandbox.
         // For custom user projects (like dept-38c4f), use the standard "(default)" database.
-        if (!dbId && firebaseConfig.projectId && firebaseConfig.projectId.startsWith("gen-lang-client-")) {
+        if (!dbId && firebaseConfig.projectId && (firebaseConfig.projectId.startsWith("gen-lang-client-") || firebaseConfig.projectId.startsWith("project-"))) {
           dbId = "ai-studio-5323cef6-5f3f-4344-b8c8-63efded4ec36";
         }
         this.db = dbId ? getFirestore(app, dbId) : getFirestore(app);
