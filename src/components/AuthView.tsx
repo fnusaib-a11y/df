@@ -136,7 +136,7 @@ export default function AuthView({ onLoginSuccess }: AuthViewProps) {
             💡 <strong>ফায়ারবেস ক্লাউড কানেকশন অফলাইন:</strong> আপনি এবং আপনার বন্ধুরা যাতে ফেসবুকে যেভাবে একাধিক ডিভাইস থেকে পোস্ট ও রিয়েল-টাইম চ্যাট করেন সেভাবে স্টারকানেক্ট সোশ্যাল কানেক্টিভিটি ব্যবহার করতে পারেন, সেজন্য আপনার ফায়ারবেস প্রজেক্টে <strong>Anonymous (অজ্ঞাতনামা)</strong> এবং <strong>Email/Password (ইমেইল/পাসওয়ার্ড)</strong> সাইন-ইন মেথড দুটো চালু করা আবশ্যক।
             <br />
             <a 
-              href="https://console.firebase.google.com/project/project-6628b134-ee05-438f-9e5/authentication/providers" 
+              href={`https://console.firebase.google.com/project/${dbService.getFirebaseProjectId() || 'dept-2c4b6'}/authentication/providers`}
               target="_blank" 
               rel="noopener noreferrer" 
               className="inline-block mt-2 font-bold underline text-amber-600 dark:text-amber-400 hover:text-amber-700"

@@ -372,6 +372,10 @@ class StarConnectDatabaseService {
     return this.firebaseAuthError;
   }
 
+  getFirebaseProjectId(): string | null {
+    return firebaseConfig && firebaseConfig.projectId ? firebaseConfig.projectId : null;
+  }
+
   private signInAnon(auth: Auth) {
     signInAnonymously(auth).then((cred) => {
       this.isFirebaseReady = true;
