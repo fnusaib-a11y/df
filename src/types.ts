@@ -98,6 +98,7 @@ export interface Post {
   unlockedByUserIds: string[]; // users who purchased this post
   lastActiveAt?: string; // Facebook-like sorting: bump on comment or interaction
   reachWeight?: number; // Admin panel control: up or down reach multiplier
+  boostUntil?: string; // ISO timestamp until which the post is boosted / Sponsored
 }
 
 export interface Comment {

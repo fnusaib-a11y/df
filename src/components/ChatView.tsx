@@ -8,6 +8,7 @@ import { ArrowLeft, Send, Search, CheckCircle, Award, Sparkles, X } from 'lucide
 import { dbService } from '../services/db';
 import { Chat, Message, UserProfile } from '../types';
 import { VerifiedBadge } from './VerifiedBadge';
+import { useOnlineStatus } from '../hooks/useOnlineStatus';
 
 interface ChatViewProps {
   onBack: () => void;
@@ -16,6 +17,7 @@ interface ChatViewProps {
 }
 
 export default function ChatView({ onBack, selectedUserId, onClearSelectedUser }: ChatViewProps) {
+  const isOnline = useOnlineStatus();
   const [chats, setChats] = React.useState<Chat[]>([]);
   const [users, setUsers] = React.useState<UserProfile[]>([]);
   const [activeChatId, setActiveChatId] = React.useState<string | null>(null);
@@ -136,6 +138,10 @@ export default function ChatView({ onBack, selectedUserId, onClearSelectedUser }
 
   const handleSendMessage = (e: React.FormEvent) => {
     e.preventDefault();
+    if (!isOnline) {
+      alert('🚫 দুঃখিত! ইন্টারনেট কানেকশন নেই। অফলাইন মোডে মেসেজ পাঠানো সম্ভব নয়।');
+      return;
+    }
     if (!newMessageText.trim() || !activePartner) return;
 
     dbService.sendMessage(activePartner.id, newMessageText);
@@ -528,14 +534,20 @@ export default function ChatView({ onBack, selectedUserId, onClearSelectedUser }
             <input
               type="text"
               required
-              placeholder="Type a message..."
+              disabled={!isOnline}
+              placeholder={isOnline ? "Type a message..." : "অফলাইন মোড: মেসেজ পাঠানো বন্ধ 🚫"}
               value={newMessageText}
               onChange={(e) => setNewMessageText(e.target.value)}
-              className="flex-1 bg-neutral-100 dark:bg-neutral-900 border border-neutral-200 dark:border-neutral-800 rounded-xl px-4 py-3 text-xs focus:outline-none focus:border-[#11af5f] text-neutral-800 dark:text-white"
+              className="flex-1 bg-neutral-100 dark:bg-neutral-900 border border-neutral-200 dark:border-neutral-800 rounded-xl px-4 py-3 text-xs focus:outline-none focus:border-[#11af5f] text-neutral-800 dark:text-white disabled:opacity-60"
             />
             <button
               type="submit"
-              className="bg-[#11af5f] text-white p-3 rounded-xl flex items-center justify-center hover:bg-[#0fa056] active:scale-95 transition"
+              disabled={!isOnline}
+              className={`p-3 rounded-xl flex items-center justify-center transition ${
+                isOnline
+                  ? 'bg-[#11af5f] text-white hover:bg-[#0fa056] active:scale-95'
+                  : 'bg-neutral-200 dark:bg-neutral-800 text-neutral-400 cursor-not-allowed'
+              }`}
             >
               <Send className="w-4 h-4 rotate-[-10deg]" />
             </button>

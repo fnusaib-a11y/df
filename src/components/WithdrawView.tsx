@@ -7,6 +7,7 @@ import React from 'react';
 import { ArrowLeft, Wallet, Send, ShieldCheck, HelpCircle, AlertCircle } from 'lucide-react';
 import { dbService } from '../services/db';
 import { WithdrawalRequest, UserProfile } from '../types';
+import { useOnlineStatus } from '../hooks/useOnlineStatus';
 
 interface WithdrawViewProps {
   onBack: () => void;
@@ -14,6 +15,7 @@ interface WithdrawViewProps {
 }
 
 export default function WithdrawView({ onBack, onSuccess }: WithdrawViewProps) {
+  const isOnline = useOnlineStatus();
   const [profile, setProfile] = React.useState<UserProfile | null>(null);
   const [history, setHistory] = React.useState<WithdrawalRequest[]>([]);
   
@@ -41,6 +43,11 @@ export default function WithdrawView({ onBack, onSuccess }: WithdrawViewProps) {
   const handleSubmit = (e: React.FormEvent) => {
     e.preventDefault();
     setErrorMessage('');
+
+    if (!isOnline) {
+      setErrorMessage('🚫 দুঃখিত! ইন্টারনেট কানেকশন নেই। অফলাইন মোডে ক্যাশ আউট রিকোয়েস্ট পাঠানো সম্ভব নয়।');
+      return;
+    }
 
     const stars = parseInt(starsToWithdraw);
     if (isNaN(stars) || stars <= 0) {

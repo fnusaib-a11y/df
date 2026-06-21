@@ -25,6 +25,7 @@ import {
 } from 'lucide-react';
 import { dbService } from '../services/db';
 import { UserProfile } from '../types';
+import { useOnlineStatus } from '../hooks/useOnlineStatus';
 
 interface CreatePostViewProps {
   onClose: () => void;
@@ -32,6 +33,7 @@ interface CreatePostViewProps {
 }
 
 export default function CreatePostView({ onClose, onPostCreated }: CreatePostViewProps) {
+  const isOnline = useOnlineStatus();
   const [profile, setProfile] = React.useState<UserProfile | null>(null);
   
   // Post data states
@@ -92,6 +94,10 @@ export default function CreatePostView({ onClose, onPostCreated }: CreatePostVie
 
   const handleShare = (e: React.FormEvent) => {
     e.preventDefault();
+    if (!isOnline) {
+      alert('🚫 দুঃখিত! ইন্টারনেট কানেকশন নেই। অফলাইন মোডে পোস্ট করা সম্ভব নয়।');
+      return;
+    }
     if (!content.trim() && !mediaUrl) return;
 
     // Apply background gradient name or info to content if selected
@@ -123,6 +129,10 @@ export default function CreatePostView({ onClose, onPostCreated }: CreatePostVie
 
   const handleGenerateCaption = async () => {
     if (!aiTopic.trim()) return;
+    if (!isOnline) {
+      alert('🚫 ইন্টারনেট কানেকশন নেই। অফলাইন মোডে AI ক্যাপশন জেনারেট করা সম্ভব নয়।');
+      return;
+    }
     setIsGenerating(true);
     try {
       const resp = await fetch('/api/gemini/suggest-caption', {
@@ -769,10 +779,18 @@ export default function CreatePostView({ onClose, onPostCreated }: CreatePostVie
         {/* Large "Next" / "Post" pill button matching the Facebook image style */}
         <button
           type="submit"
-          disabled={!content.trim() && !mediaUrl}
-          className="w-full py-3 bg-indigo-650 hover:bg-indigo-700 disabled:bg-[#e4e6eb] disabled:dark:bg-zinc-800 text-white disabled:text-[#bcc0c4] disabled:dark:text-zinc-650 font-black text-xs rounded-xl shadow-md transition-all active:scale-98 cursor-pointer select-none text-center block"
+          disabled={!isOnline || (!content.trim() && !mediaUrl)}
+          className={`w-full py-3 font-black text-xs rounded-xl shadow-md transition-all active:scale-98 cursor-pointer select-none text-center block ${
+            !isOnline
+              ? 'bg-rose-600 text-white hover:bg-rose-700 cursor-not-allowed'
+              : 'bg-indigo-650 hover:bg-indigo-700 disabled:bg-[#e4e6eb] disabled:dark:bg-zinc-800 text-white disabled:text-[#bcc0c4] disabled:dark:text-zinc-650'
+          }`}
         >
-          {mediaUrl && mediaType === 'image' && isPremium ? 'Post Premium Photo 🔒🌟' : 'Post'}
+          {!isOnline 
+            ? 'অফলাইনে পোস্ট করা যাবে না 🚫' 
+            : mediaUrl && mediaType === 'image' && isPremium 
+            ? 'Post Premium Photo 🔒🌟' 
+            : 'Post'}
         </button>
 
       </div>

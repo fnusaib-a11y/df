@@ -8,6 +8,40 @@ import { Search, Bell, Heart, MessageCircle, Share2, MoreHorizontal, CheckCircle
 import { Post, Comment, Story, UserProfile, NotificationItem } from '../types';
 import { dbService } from '../services/db';
 import { VerifiedBadge } from './VerifiedBadge';
+import { useOnlineStatus } from '../hooks/useOnlineStatus';
+
+const safeFormatTime = (dateStr?: string) => {
+  if (!dateStr) return '';
+  try {
+    const d = new Date(dateStr);
+    if (isNaN(d.getTime())) return '';
+    return d.toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' });
+  } catch (err) {
+    return '';
+  }
+};
+
+const safeFormatDate = (dateStr?: string) => {
+  if (!dateStr) return '';
+  try {
+    const d = new Date(dateStr);
+    if (isNaN(d.getTime())) return '';
+    return d.toLocaleDateString([], { month: 'short', day: 'numeric' });
+  } catch (err) {
+    return '';
+  }
+};
+
+const safeFormatDateTimeString = (dateStr?: string) => {
+  if (!dateStr) return '';
+  try {
+    const d = new Date(dateStr);
+    if (isNaN(d.getTime())) return '';
+    return `${d.toLocaleDateString()} • ${d.toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' })}`;
+  } catch (err) {
+    return '';
+  }
+};
 
 interface FeedViewProps {
   onNavigate: (screen: string) => void;
@@ -16,6 +50,7 @@ interface FeedViewProps {
 }
 
 export default function FeedView({ onNavigate, onUserSelect, onMessageUser }: FeedViewProps) {
+  const isOnline = useOnlineStatus();
   const [activeCategory, setActiveCategory] = React.useState('All');
   const [posts, setPosts] = React.useState<Post[]>([]);
   const [stories, setStories] = React.useState<Story[]>([]);
@@ -266,6 +301,10 @@ export default function FeedView({ onNavigate, onUserSelect, onMessageUser }: Fe
   };
 
   const handleStoryFileChange = (e: React.ChangeEvent<HTMLInputElement>) => {
+    if (!isOnline) {
+      alert('🚫 ইন্টারনেট কানেকশন নেই। অফলাইন মোডে স্টোরি আপলোড করা সম্ভব নয়।');
+      return;
+    }
     const file = e.target.files?.[0];
     if (!file) return;
 
@@ -316,6 +355,10 @@ export default function FeedView({ onNavigate, onUserSelect, onMessageUser }: Fe
   };
 
   const handleToggleLike = (postId: string) => {
+    if (!isOnline) {
+      alert('🚫 দুঃখিত! ইন্টারনেট কানেকশন নেই। অফলাইন মোডে লাইক করা সম্ভব নয়।');
+      return;
+    }
     dbService.toggleLike(postId);
     loadFeedData();
   };
@@ -336,6 +379,10 @@ export default function FeedView({ onNavigate, onUserSelect, onMessageUser }: Fe
 
   const handleAddComment = (e: React.FormEvent) => {
     e.preventDefault();
+    if (!isOnline) {
+      alert('🚫 দুঃখিত! ইন্টারনেট কানেকশন নেই। অফলাইন মোডে কমেন্ট করা সম্ভব নয়।');
+      return;
+    }
     if (!newCommentText.trim() || !activeCommentsPost) return;
 
     const currentPostId = activeCommentsPost.id;
@@ -356,6 +403,10 @@ export default function FeedView({ onNavigate, onUserSelect, onMessageUser }: Fe
   };
 
   const handleUnlockPost = (postId: string, price: number) => {
+    if (!isOnline) {
+      alert('🚫 ইন্টারনেট কানেকশন নেই। অফলাইন মোডে পোস্ট আনলক করা সম্ভব নয়।');
+      return;
+    }
     if (!myProfile) return;
     if (myProfile.starBalance < price) {
       const confirmBuy = window.confirm(`Oops! Your wallet balance is insufficient (Requires ${price} Stars).\n\nWould you like to visit the wallet page to add stars now? 📥`);
@@ -385,6 +436,10 @@ export default function FeedView({ onNavigate, onUserSelect, onMessageUser }: Fe
   };
 
   const handleSendGift = () => {
+    if (!isOnline) {
+      setGiftingError('🚫 ইন্টারনেট কানেকশন নেই। অফলাইন মোডে গিফট পাঠানো সম্ভব নয়।');
+      return;
+    }
     if (!giftingPost || !myProfile) return;
     if (myProfile.id === giftingPost.authorId) {
       setGiftingError('You cannot send star gifts to yourself!');
@@ -408,6 +463,10 @@ export default function FeedView({ onNavigate, onUserSelect, onMessageUser }: Fe
   };
 
   const handleReportPostSubmit = () => {
+    if (!isOnline) {
+      alert('🚫 ইন্টারনেট কানেকশন নেই। অফলাইন মোডে রিপোর্ট করা সম্ভব নয়।');
+      return;
+    }
     if (!reportReason.trim() || !selectedPostOptions) return;
 
     dbService.reportContent(
@@ -573,7 +632,7 @@ export default function FeedView({ onNavigate, onUserSelect, onMessageUser }: Fe
                     <span className="font-extrabold text-slate-850 dark:text-zinc-100 block">{notif.senderName}</span>
                     <p className="text-zinc-650 dark:text-zinc-400 font-semibold mt-0.5">{notif.text}</p>
                     <span className="text-[8px] text-slate-400 font-mono block mt-1">
-                      {new Date(notif.createdAt).toLocaleDateString()} • {new Date(notif.createdAt).toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' })}
+                      {safeFormatDateTimeString(notif.createdAt)}
                     </span>
                   </div>
                 </div>
@@ -773,12 +832,20 @@ export default function FeedView({ onNavigate, onUserSelect, onMessageUser }: Fe
                         )}
                       </span>
                       <span className="text-[9.5px] text-zinc-400 font-bold font-mono block">
-                        {new Date(post.createdAt).toLocaleDateString([], { month: 'short', day: 'numeric' })} • {post.category || 'General'}
+                        {safeFormatDate(post.createdAt)} • {post.category || 'General'}
                       </span>
                     </div>
                   </div>
 
                   <div className="flex items-center gap-1.5">
+                    {/* Sponsored/Boosted Post badge */}
+                    {post.boostUntil && new Date(post.boostUntil).getTime() > Date.now() && (
+                      <span className="bg-indigo-50 dark:bg-indigo-950/40 text-indigo-700 dark:text-indigo-400 text-[8px] font-black px-2 py-0.5 rounded-full select-none flex items-center gap-1 uppercase tracking-wider border border-indigo-100 dark:border-indigo-900/40 animate-pulse">
+                        <Sparkles className="w-2.5 h-2.5 text-amber-500 fill-amber-500" />
+                        <span>Sponsored</span>
+                      </span>
+                    )}
+
                     {/* Premium Post badge */}
                     {post.isPremiumPost && (
                       <span className="bg-amber-500 text-white text-[8px] font-black px-2 py-0.5 rounded-full select-none flex items-center gap-0.5 uppercase tracking-wider shadow-sm">
@@ -962,7 +1029,7 @@ export default function FeedView({ onNavigate, onUserSelect, onMessageUser }: Fe
                 <div>
                   <span className="text-xs font-black block leading-none">{currentStory.userName}</span>
                   <span className="text-[8px] text-zinc-400 font-mono mt-0.5">
-                    {new Date(currentStory.createdAt).toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' })}
+                    {safeFormatTime(currentStory.createdAt)}
                   </span>
                 </div>
               </div>
@@ -1123,7 +1190,7 @@ export default function FeedView({ onNavigate, onUserSelect, onMessageUser }: Fe
                       <div className="flex items-center justify-between mb-1">
                         <span className="text-[11px] font-bold text-slate-800 dark:text-neutral-250">{cmt.authorName}</span>
                         <span className="text-[8.5px] text-zinc-400 font-mono">
-                          {new Date(cmt.createdAt).toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' })}
+                          {safeFormatTime(cmt.createdAt)}
                         </span>
                       </div>
                       <p className="text-xs text-slate-655 dark:text-neutral-300 leading-relaxed font-sans font-medium break-words">{cmt.content}</p>

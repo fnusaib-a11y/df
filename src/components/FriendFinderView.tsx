@@ -8,6 +8,7 @@ import { ArrowLeft, Search, CheckCircle, UserPlus, UserMinus, ShieldAlert, UserC
 import { dbService } from '../services/db';
 import { UserProfile, FriendRequest } from '../types';
 import { VerifiedBadge } from './VerifiedBadge';
+import { useOnlineStatus } from '../hooks/useOnlineStatus';
 
 interface FriendFinderViewProps {
   onBack: () => void;
@@ -16,6 +17,7 @@ interface FriendFinderViewProps {
 }
 
 export default function FriendFinderView({ onBack, onNavigate, onChatWithUser }: FriendFinderViewProps) {
+  const isOnline = useOnlineStatus();
   const [searchQuery, setSearchQuery] = React.useState('');
   const [subTab, setSubTab] = React.useState<'requests' | 'suggestions' | 'friends'>('requests');
   const [users, setUsers] = React.useState<UserProfile[]>([]);
@@ -42,16 +44,28 @@ export default function FriendFinderView({ onBack, onNavigate, onChatWithUser }:
 
   // Actions for database friends
   const handleAcceptRequest = (requestId: string) => {
+    if (!isOnline) {
+      alert('🚫 ইন্টারনেট কানেকশন নেই। অফলাইন মোডে ফ্রেন্ড রিকোয়েস্ট এক্সেপ্ট করা সম্ভব নয়।');
+      return;
+    }
     dbService.acceptFriendRequest(requestId);
     loadData();
   };
 
   const handleCancelRequest = (requestId: string) => {
+    if (!isOnline) {
+      alert('🚫 ইন্টারনেট কানেকশন নেই। অফলাইন মোডে ফ্রেন্ড রিকোয়েস্ট বাতিল করা সম্ভব নয়।');
+      return;
+    }
     dbService.cancelFriendRequest(requestId);
     loadData();
   };
 
   const handleSendRequest = (userId: string) => {
+    if (!isOnline) {
+      alert('🚫 ইন্টারনেট কানেকশন নেই। অফলাইন মোডে ফ্রেন্ড রিকোয়েস্ট পাঠানো সম্ভব নয়।');
+      return;
+    }
     dbService.sendFriendRequest(userId);
     loadData();
   };

@@ -4,8 +4,9 @@
  */
 
 import React from 'react';
-import { ArrowLeft, User, UserPlus, Star, LogOut, Award, ShieldAlert } from 'lucide-react';
+import { ArrowLeft, User, UserPlus, Star, LogOut, Award, ShieldAlert, WifiOff } from 'lucide-react';
 import { dbService } from '../services/db';
+import { offlineService } from '../services/offline';
 import { UserProfile } from '../types';
 
 interface SettingsViewProps {
@@ -16,12 +17,19 @@ interface SettingsViewProps {
 
 export default function SettingsView({ onBack, onNavigate, onLogout }: SettingsViewProps) {
   const [currentUser, setCurrentUser] = React.useState<UserProfile>(dbService.getCurrentUser());
+  const [isSimulatedOffline, setIsSimulatedOffline] = React.useState(offlineService.getSimulatedOffline());
   const authErr = dbService.getAuthError();
 
   const handleMakePremium = () => {
     const updated = dbService.requestPremium();
     setCurrentUser({ ...updated });
     alert('Congratulations! You are now a premium member. ✨');
+  };
+
+  const handleToggleOfflineSimulator = () => {
+    const nextVal = !isSimulatedOffline;
+    offlineService.setSimulatedOffline(nextVal);
+    setIsSimulatedOffline(nextVal);
   };
 
   return (
@@ -107,6 +115,44 @@ export default function SettingsView({ onBack, onNavigate, onLogout }: SettingsV
             <span className="text-xs text-neutral-400 group-hover:translate-x-1 transition font-mono">&gt;</span>
           </button>
 
+        </div>
+
+        {/* Network & Offline Simulator Box */}
+        <div className="bg-amber-550/5 dark:bg-amber-955/20 rounded-2xl p-4 shadow-sm border border-neutral-200 dark:border-neutral-800 space-y-3">
+          <h2 className="text-[10px] font-black text-slate-400 dark:text-zinc-500 uppercase tracking-widest pl-1">Network Settings / ইন্টারনেট সেটিংস</h2>
+          <div className="bg-white dark:bg-neutral-900 rounded-xl p-3.5 flex items-center justify-between border border-neutral-150 dark:border-neutral-800/60">
+            <div>
+              <span className="text-xs font-black text-neutral-800 dark:text-neutral-200 block flex items-center gap-1">
+                <WifiOff className="w-3.5 h-3.5 text-neutral-500" />
+                অফলাইন মোড সিমুলেট করুন
+              </span>
+              <span className="text-[9px] text-slate-400 font-extrabold block mt-0.5 whitespace-pre-wrap">
+                (ইন্টারনেট ছাড়া এপ দেখা ট্রাই করার জন্য)
+              </span>
+            </div>
+            <button
+              type="button"
+              onClick={handleToggleOfflineSimulator}
+              className={`relative inline-flex h-6 w-11 shrink-0 cursor-pointer rounded-full border-2 border-transparent transition-colors duration-200 ease-in-out focus:outline-none ${
+                isSimulatedOffline ? 'bg-amber-500' : 'bg-neutral-200 dark:bg-neutral-800'
+              }`}
+            >
+              <span
+                className={`pointer-events-none inline-block h-5 w-5 transform rounded-full bg-white shadow-lg ring-0 transition duration-200 ease-in-out ${
+                  isSimulatedOffline ? 'translate-x-5' : 'translate-x-0'
+                }`}
+              />
+            </button>
+          </div>
+          {isSimulatedOffline ? (
+            <div className="p-3 bg-red-500/10 border border-red-500/25 rounded-xl text-[10.5px] text-rose-650 dark:text-rose-400 font-bold leading-relaxed">
+              🔔 সিমুলেটেড অফলাইন মোড চালু করা হয়েছে। অ্যাপের আগের সকল কন্টেন্ট পড়া যাবে কিন্তু নতুন পোস্ট, লাইক ও কমেন্ট করা যাবে না।
+            </div>
+          ) : (
+            <div className="p-3 bg-emerald-500/10 border border-emerald-500/25 rounded-xl text-[10.5px] text-emerald-700 dark:text-emerald-400 font-bold leading-relaxed">
+              🟢 অ্যাপটি ইন্টারনেটের সাথে যুক্ত। আপনি লাইক, কমেন্ট ও পোস্ট সহ সব ফিচার ব্যবহার করতে পারবেন।
+            </div>
+          )}
         </div>
 
         {/* Premium Upgrade Card if not premium */}

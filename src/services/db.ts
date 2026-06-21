@@ -18,7 +18,8 @@ import {
   TransactionItem,
   ReferralSettings,
   VerificationSettings,
-  FriendRequest
+  FriendRequest,
+  StarDepositRequest
 } from '../types';
 
 import { initializeApp } from 'firebase/app';
@@ -54,6 +55,7 @@ const STORAGE_KEYS = {
   REFERRAL_SETTINGS: 'starconnect_referral_settings',
   VERIFICATION_SETTINGS: 'starconnect_verification_settings',
   FRIEND_REQUESTS: 'starconnect_friend_requests_db',
+  STAR_DEPOSITS: 'starconnect_star_deposits_db',
 };
 
 // Standard Star Packages
@@ -317,6 +319,7 @@ const BOOTSTRAP_DATA = {
 
   transactions: [] as TransactionItem[],
   friendRequests: [] as FriendRequest[],
+  starDeposits: [] as StarDepositRequest[],
 
   referralSettings: {
     isEnabled: true,
@@ -748,11 +751,11 @@ class StarConnectDatabaseService {
         });
         // Keep feed sorted by reachWeight first, and then lastActiveAt or createdAt
         this.cache.posts.sort((a, b) => {
-          const wB = b.reachWeight || 0;
-          const wA = a.reachWeight || 0;
+          const wB = this.getPostReachWeight(b);
+          const wA = this.getPostReachWeight(a);
           if (wB !== wA) return wB - wA;
-          const tB = new Date(b.lastActiveAt || b.createdAt).getTime();
-          const tA = new Date(a.lastActiveAt || a.createdAt).getTime();
+          const tB = new Date(b.lastActiveAt || b.createdAt || 0).getTime() || 0;
+          const tA = new Date(a.lastActiveAt || a.createdAt || 0).getTime() || 0;
           return tB - tA;
         });
         this.sync();
@@ -1077,6 +1080,7 @@ class StarConnectDatabaseService {
       const referralSettings = localStorage.getItem(STORAGE_KEYS.REFERRAL_SETTINGS);
       const verificationSettings = localStorage.getItem(STORAGE_KEYS.VERIFICATION_SETTINGS);
       const friendRequests = localStorage.getItem(STORAGE_KEYS.FRIEND_REQUESTS);
+      const starDeposits = localStorage.getItem(STORAGE_KEYS.STAR_DEPOSITS);
  
       data.currentUser = uCurrent && uCurrent !== 'null' ? JSON.parse(uCurrent) : null;
       
@@ -1097,6 +1101,7 @@ class StarConnectDatabaseService {
       data.referralSettings = referralSettings ? JSON.parse(referralSettings) : BOOTSTRAP_DATA.referralSettings;
       data.verificationSettings = verificationSettings ? JSON.parse(verificationSettings) : BOOTSTRAP_DATA.verificationSettings;
       data.friendRequests = friendRequests ? JSON.parse(friendRequests) : BOOTSTRAP_DATA.friendRequests;
+      data.starDeposits = starDeposits ? JSON.parse(starDeposits) : BOOTSTRAP_DATA.starDeposits;
       
       if (!uCurrent) this.saveToStorage(data);
       return data as typeof BOOTSTRAP_DATA;
@@ -1127,6 +1132,7 @@ class StarConnectDatabaseService {
         localStorage.setItem(STORAGE_KEYS.VERIFICATION_SETTINGS, JSON.stringify(data.verificationSettings));
       }
       localStorage.setItem(STORAGE_KEYS.FRIEND_REQUESTS, JSON.stringify(data.friendRequests));
+      localStorage.setItem(STORAGE_KEYS.STAR_DEPOSITS, JSON.stringify(data.starDeposits));
     } catch (e: any) {
       console.error("[Storage Quota Info] Local storage exceeded 5MB limit or threw an exception:", e);
       if (e.name === 'QuotaExceededError' || e.code === 22) {
@@ -1813,11 +1819,11 @@ class StarConnectDatabaseService {
     }
 
     return list.sort((a, b) => {
-      const wB = b.reachWeight || 0;
-      const wA = a.reachWeight || 0;
+      const wB = this.getPostReachWeight(b);
+      const wA = this.getPostReachWeight(a);
       if (wB !== wA) return wB - wA;
-      const tB = new Date(b.lastActiveAt || b.createdAt).getTime();
-      const tA = new Date(a.lastActiveAt || a.createdAt).getTime();
+      const tB = new Date(b.lastActiveAt || b.createdAt || 0).getTime() || 0;
+      const tA = new Date(a.lastActiveAt || a.createdAt || 0).getTime() || 0;
       return tB - tA;
     });
   }
@@ -1828,11 +1834,11 @@ class StarConnectDatabaseService {
     return this.cache.posts
       .filter(p => !blocked.includes(p.authorId) && (p.isReel || p.mediaType === 'video'))
       .sort((a, b) => {
-        const wB = b.reachWeight || 0;
-        const wA = a.reachWeight || 0;
+        const wB = this.getPostReachWeight(b);
+        const wA = this.getPostReachWeight(a);
         if (wB !== wA) return wB - wA;
-        const tB = new Date(b.lastActiveAt || b.createdAt).getTime();
-        const tA = new Date(a.lastActiveAt || a.createdAt).getTime();
+        const tB = new Date(b.lastActiveAt || b.createdAt || 0).getTime() || 0;
+        const tA = new Date(a.lastActiveAt || a.createdAt || 0).getTime() || 0;
         return tB - tA;
       });
   }
@@ -1841,11 +1847,11 @@ class StarConnectDatabaseService {
     return this.cache.posts
       .filter(p => p.authorId === authorId)
       .sort((a, b) => {
-        const wB = b.reachWeight || 0;
-        const wA = a.reachWeight || 0;
+        const wB = this.getPostReachWeight(b);
+        const wA = this.getPostReachWeight(a);
         if (wB !== wA) return wB - wA;
-        const tB = new Date(b.lastActiveAt || b.createdAt).getTime();
-        const tA = new Date(a.lastActiveAt || a.createdAt).getTime();
+        const tB = new Date(b.lastActiveAt || b.createdAt || 0).getTime() || 0;
+        const tA = new Date(a.lastActiveAt || a.createdAt || 0).getTime() || 0;
         return tB - tA;
       });
   }
@@ -2641,7 +2647,21 @@ class StarConnectDatabaseService {
     return null;
   }
 
-  updatePostMetrics(postId: string, likesCount: number, commentsCount: number, reachWeight?: number, lastActiveAt?: string) {
+  getPostReachWeight(post: Post): number {
+    if (post.boostUntil) {
+      if (new Date(post.boostUntil).getTime() < Date.now()) {
+        return 0; // expired, falls back to normal
+      }
+    }
+    return post.reachWeight || 0;
+  }
+
+  isPostBoosted(post: Post): boolean {
+    if (!post.boostUntil) return false;
+    return new Date(post.boostUntil).getTime() > Date.now();
+  }
+
+  updatePostMetrics(postId: string, likesCount: number, commentsCount: number, reachWeight?: number, lastActiveAt?: string, boostUntil?: string) {
     const post = this.cache.posts.find(p => p.id === postId);
     if (post) {
       post.likesCount = likesCount;
@@ -2652,6 +2672,9 @@ class StarConnectDatabaseService {
       if (lastActiveAt !== undefined) {
         post.lastActiveAt = lastActiveAt;
       }
+      if (boostUntil !== undefined) {
+        post.boostUntil = boostUntil;
+      }
       this.sync();
       
       if (this.isFirebaseReady && this.db) {
@@ -2659,6 +2682,135 @@ class StarConnectDatabaseService {
       }
       window.dispatchEvent(new CustomEvent('starconnect_db_update'));
     }
+  }
+
+  // --- Star Deposit Requests (BKash / Nagad with Approval) ---
+  submitStarDepositRequest(starsCount: number, amountBDT: number, paymentMethod: 'bKash' | 'Nagad', senderNumber: string, transactionId: string, screenshotUrl?: string): StarDepositRequest {
+    if (!this.cache.starDeposits) this.cache.starDeposits = [];
+    const me = this.cache.currentUser;
+    if (!me) {
+      throw new Error("Logged in profile is required to purchase stars.");
+    }
+
+    const reqId = 'dep_' + Math.random().toString(36).substr(2, 9);
+    const newRequest: StarDepositRequest = {
+      id: reqId,
+      userId: me.id,
+      userName: me.name,
+      userPhone: me.phone || '',
+      starsCount,
+      amountBDT,
+      paymentMethod,
+      senderNumber,
+      transactionId,
+      screenshotUrl: screenshotUrl || '',
+      status: 'pending',
+      createdAt: new Date().toISOString()
+    };
+
+    this.cache.starDeposits.unshift(newRequest);
+    this.sync();
+    window.dispatchEvent(new CustomEvent('starconnect_db_update'));
+    return newRequest;
+  }
+
+  getStarDepositRequests(): StarDepositRequest[] {
+    return this.cache.starDeposits || [];
+  }
+
+  getStarDepositRequestsByUser(userId: string): StarDepositRequest[] {
+    return (this.cache.starDeposits || []).filter(d => d.userId === userId);
+  }
+
+  approveStarDepositRequest(requestId: string) {
+    if (!this.cache.starDeposits) this.cache.starDeposits = [];
+    const idx = this.cache.starDeposits.findIndex(d => d.id === requestId);
+    if (idx === -1) return;
+
+    const req = this.cache.starDeposits[idx];
+    req.status = 'approved';
+
+    const user = this.getUserById(req.userId);
+    if (user) {
+      user.starBalance = (user.starBalance || 0) + req.starsCount;
+      this.updateUserRecord(user);
+
+      // Add transaction & notification
+      this.addTransaction(user.id, 'buy_stars', req.starsCount, req.amountBDT, req.id, `${req.paymentMethod} Deposit Approved`);
+      this.addNotification(
+        user.id, 
+        'user_admin', 
+        'StarConnect Billing', 
+        'https://images.unsplash.com/photo-1560250097-0b93528c311a?auto=format&fit=crop&w=300&q=80', 
+        'premium', 
+        `নিশ্চিতকরণ! আপনার ৳${req.amountBDT} BDT রিচার্জ আবেদন এপ্রুভ করা হয়েছে। ${req.starsCount} Stars আপনার একাউন্টে যোগ করা হয়েছে।`
+      );
+
+      // Process referral commission
+      const refSettings = this.cache.referralSettings || {
+        isEnabled: true,
+        signupBonusStars: 10,
+        purchaseCommissionPercent: 10
+      };
+
+      if (refSettings.isEnabled && user.referredBy) {
+        const referrer = this.getUserById(user.referredBy);
+        if (referrer) {
+          const commissionPercent = refSettings.purchaseCommissionPercent || 0;
+          const commissionStars = Math.floor((req.starsCount * commissionPercent) / 100);
+          if (commissionStars > 0) {
+            referrer.starBalance = (referrer.starBalance || 0) + commissionStars;
+            referrer.totalStarsEarned = (referrer.totalStarsEarned || 0) + commissionStars;
+            referrer.totalReferralBonus = (referrer.totalReferralBonus || 0) + commissionStars;
+            this.updateUserRecord(referrer);
+
+            this.addTransaction(
+              referrer.id, 
+              'post_earn', 
+              commissionStars, 
+              undefined, 
+              'ref_comm_' + Math.random().toString(36).substr(2, 6), 
+              `Referral Commission structure from ${user.name}`
+            );
+            this.addNotification(
+              referrer.id,
+              'user_admin',
+              'Referral Bonus',
+              'https://images.unsplash.com/photo-1560250097-0b93528c311a?auto=format&fit=crop&w=300&q=80',
+              'premium',
+              `আপনি ${commissionStars} Stars রেফারাল বোনাস পেয়েছেন কারণ আপনার আমন্ত্রিত ইউজার ${user.name} তার একাউন্টে স্টার রিচার্জ করেছে।`
+            );
+          }
+        }
+      }
+    }
+
+    this.sync();
+    window.dispatchEvent(new CustomEvent('starconnect_db_update'));
+  }
+
+  rejectStarDepositRequest(requestId: string) {
+    if (!this.cache.starDeposits) this.cache.starDeposits = [];
+    const idx = this.cache.starDeposits.findIndex(d => d.id === requestId);
+    if (idx === -1) return;
+
+    const req = this.cache.starDeposits[idx];
+    req.status = 'rejected';
+
+    const user = this.getUserById(req.userId);
+    if (user) {
+      this.addNotification(
+        user.id, 
+        'user_admin', 
+        'StarConnect Billing', 
+        'https://images.unsplash.com/photo-1560250097-0b93528c311a?auto=format&fit=crop&w=300&q=80', 
+        'withdrawal_update', 
+        `দুঃখিত! আপনার ৳${req.amountBDT} BDT রিচার্জ আবেদনটি প্রত্যাখ্যাত (Reject) হয়েছে। অনুগ্রহ করে সঠিক ট্রানজেকশন তথ্য বা স্ক্রিনশট দিয়ে আবার চেষ্টা করুন।`
+      );
+    }
+
+    this.sync();
+    window.dispatchEvent(new CustomEvent('starconnect_db_update'));
   }
 
   deletePost(postId: string) {

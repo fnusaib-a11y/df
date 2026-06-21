@@ -22,11 +22,13 @@ import AuthView from './components/AuthView';
 
 import { AppScreen, UserProfile, Post } from './types';
 import { dbService } from './services/db';
+import { useOnlineStatus } from './hooks/useOnlineStatus';
 
 export default function App() {
   const [currentScreen, setCurrentScreen] = React.useState<AppScreen>(AppScreen.FEED);
   const [currentUser, setCurrentUser] = React.useState<UserProfile | null>(null);
   const [dbUpdateTick, setDbUpdateTick] = React.useState(0);
+  const isOnline = useOnlineStatus();
 
   // Listen for real-time local database changes
   React.useEffect(() => {
@@ -227,6 +229,12 @@ export default function App() {
           
           {/* Main Display screen router */}
           <div className="flex-1 flex flex-col overflow-hidden">
+            {!isOnline && (
+              <div className="bg-red-600 text-white px-4 py-2 text-center text-[11px] font-black flex items-center justify-center gap-1.5 select-none shrink-0 tracking-wide shadow-sm">
+                <span className="w-2 h-2 rounded-full bg-white animate-pulse"></span>
+                <span>অফলাইন মোড: নতুন পোস্ট, লাইক ও কমেন্ট করা যাবে না 🚫</span>
+              </div>
+            )}
             {renderActiveScreen()}
           </div>
 

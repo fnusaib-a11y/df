@@ -4,16 +4,16 @@
  */
 
 import React from 'react';
-import { ArrowLeft, Shield, AlertTriangle, CheckCircle, Trash2, UserX, Award, Coins, FileCheck, Landmark, Bell, Heart, Sparkles } from 'lucide-react';
+import { ArrowLeft, Shield, AlertTriangle, CheckCircle, Trash2, UserX, Award, Coins, FileCheck, Landmark, Bell, Heart, Sparkles, Wallet } from 'lucide-react';
 import { dbService } from '../services/db';
-import { Report, Post, UserProfile, WithdrawalRequest, TransactionItem } from '../types';
+import { Report, Post, UserProfile, WithdrawalRequest, TransactionItem, StarDepositRequest } from '../types';
 import { VerifiedBadge } from './VerifiedBadge';
 
 interface AdminPanelViewProps {
   onBack: () => void;
 }
 
-type AdminTab = 'kyc' | 'withdrawals' | 'reports' | 'users' | 'referrals' | 'verification' | 'notifications' | 'booster';
+type AdminTab = 'kyc' | 'withdrawals' | 'reports' | 'users' | 'referrals' | 'verification' | 'notifications' | 'booster' | 'deposits';
 
 export default function AdminPanelView({ onBack }: AdminPanelViewProps) {
   const [activeTab, setActiveTab] = React.useState<AdminTab>('kyc');
@@ -21,6 +21,7 @@ export default function AdminPanelView({ onBack }: AdminPanelViewProps) {
   const [allUsers, setAllUsers] = React.useState<UserProfile[]>([]);
   const [withdrawals, setWithdrawals] = React.useState<WithdrawalRequest[]>([]);
   const [transactions, setTransactions] = React.useState<TransactionItem[]>([]);
+  const [starDeposits, setStarDeposits] = React.useState<StarDepositRequest[]>([]);
   const [refSettings, setRefSettings] = React.useState({
     isEnabled: true,
     signupBonusStars: 10,
@@ -42,6 +43,7 @@ export default function AdminPanelView({ onBack }: AdminPanelViewProps) {
     setReports(dbService.getReports());
     setAllUsers(dbService.getUsers());
     setWithdrawals(dbService.getWithdrawalHistory());
+    setStarDeposits(dbService.getStarDepositRequests());
     setRefSettings(dbService.getReferralSettings());
     setVerSettings(dbService.getVerificationSettings());
     
@@ -51,6 +53,18 @@ export default function AdminPanelView({ onBack }: AdminPanelViewProps) {
       allTxs.push(...dbService.getTransactions(u.id));
     });
     setTransactions(allTxs);
+  };
+
+  const handleApproveDeposit = (id: string) => {
+    dbService.approveStarDepositRequest(id);
+    alert('স্টার রিচার্জ রিকোয়েস্ট সফলভাবে এপ্রুভ করা হয়েছে! 🌟');
+    loadAdminData();
+  };
+
+  const handleRejectDeposit = (id: string) => {
+    dbService.rejectStarDepositRequest(id);
+    alert('স্টার রিচার্জ রিকোয়েস্টটি রিজেক্ট করা হয়েছে। ❌');
+    loadAdminData();
   };
 
   React.useEffect(() => {
@@ -213,7 +227,7 @@ export default function AdminPanelView({ onBack }: AdminPanelViewProps) {
         </div>
 
         {/* Tab Selection Row */}
-        <div className="grid grid-cols-4 gap-1.5 bg-white dark:bg-zinc-900 p-1.5 rounded-2xl border border-neutral-200 dark:border-neutral-800">
+        <div className="grid grid-cols-3 gap-1.5 bg-white dark:bg-zinc-900 p-1.5 rounded-2xl border border-neutral-200 dark:border-neutral-800">
           <button
             onClick={() => setActiveTab('kyc')}
             className={`py-2 rounded-xl text-[10px] font-black transition text-center flex flex-col items-center gap-1 cursor-pointer ${
@@ -224,7 +238,7 @@ export default function AdminPanelView({ onBack }: AdminPanelViewProps) {
           >
             <FileCheck className="w-4 h-4 shrink-0" />
             <span className="relative">
-              KYC {pendingKycCount > 0 && (
+              KYC {allUsers.filter(u => u.kycStatus === 'pending').length > 0 && (
                 <span className="absolute -top-1.5 -right-3 w-2 h-2 rounded-full bg-rose-500"></span>
               )}
             </span>
@@ -240,8 +254,24 @@ export default function AdminPanelView({ onBack }: AdminPanelViewProps) {
           >
             <Landmark className="w-4 h-4 shrink-0" />
             <span className="relative">
-              Withdraw {pendingWithdrawalsCount > 0 && (
+              Withdraw {withdrawals.filter(w => w.status === 'pending').length > 0 && (
                 <span className="absolute -top-1.5 -right-3 w-2 h-2 rounded-full bg-rose-500"></span>
+              )}
+            </span>
+          </button>
+
+          <button
+            onClick={() => setActiveTab('deposits')}
+            className={`py-2 rounded-xl text-[10px] font-black transition text-center flex flex-col items-center gap-1 cursor-pointer ${
+              activeTab === 'deposits'
+                ? 'bg-indigo-650 text-white font-extrabold shadow-sm'
+                : 'text-zinc-500 hover:bg-neutral-800 dark:hover:bg-neutral-850'
+            }`}
+          >
+            <Wallet className="w-4 h-4 shrink-0 text-emerald-500" />
+            <span className="relative">
+              Star Deposits {starDeposits.filter(d => d.status === 'pending').length > 0 && (
+                <span className="absolute -top-1.5 -right-3.5 w-2 h-2 bg-rose-500 rounded-full"></span>
               )}
             </span>
           </button>
@@ -395,7 +425,7 @@ export default function AdminPanelView({ onBack }: AdminPanelViewProps) {
             <div className="space-y-3">
               <div className="flex justify-between items-center px-1">
                 <span className="text-xs font-black text-slate-400 uppercase tracking-widest">Withdrawal / Cashout Requests</span>
-                <span className="text-[10px] bg-indigo-50 text-indigo-600 font-bold px-2 py-0.5 rounded-full">{pendingWithdrawalsCount} pending cashouts</span>
+                <span className="text-[10px] bg-indigo-50 text-indigo-600 font-bold px-2 py-0.5 rounded-full">{withdrawals.filter(w=>w.status==='pending').length} pending cashouts</span>
               </div>
 
               {withdrawals.length === 0 ? (
@@ -458,6 +488,117 @@ export default function AdminPanelView({ onBack }: AdminPanelViewProps) {
                         >
                           <Coins className="w-4 h-4" />
                           <span>Pay & Mark Approved</span>
+                        </button>
+                      </div>
+                    )}
+                  </div>
+                ))
+              )}
+            </div>
+          )}
+
+          {/* Tab Star Deposits: Manual Top-up Approvals */}
+          {activeTab === 'deposits' && (
+            <div className="space-y-3">
+              <div className="flex justify-between items-center px-1">
+                <span className="text-xs font-black text-slate-400 uppercase tracking-widest">Star Deposit Requests (বিকাশ / নগদ)</span>
+                <span className="text-[10px] bg-[#e6fbf3] text-emerald-600 font-extrabold px-2.5 py-0.5 rounded-full">
+                  {starDeposits.filter(d => d.status === 'pending').length} pending
+                </span>
+              </div>
+
+              {starDeposits.length === 0 ? (
+                <div className="text-center py-12 bg-white dark:bg-neutral-900 border border-neutral-150 rounded-[24px] p-5 text-neutral-400">
+                  <p className="text-xs font-bold text-slate-600 dark:text-zinc-300">কোনো ডিপোজিট আবেদন পাওয়া যায়নি। 😊</p>
+                  <p className="text-[10px] mt-1">Users will see billing items when they purchase Star packs.</p>
+                </div>
+              ) : (
+                starDeposits.map((dep) => (
+                  <div
+                    key={dep.id}
+                    className="bg-white dark:bg-neutral-900 border border-neutral-150 rounded-[22px] p-5 shadow-sm space-y-4"
+                  >
+                    <div className="flex justify-between items-start">
+                      <div>
+                        <span className="text-xs font-black text-slate-800 dark:text-zinc-200 block">
+                          {dep.userName || 'Unknown User'}
+                        </span>
+                        <span className="text-[9.5px] font-bold font-mono text-zinc-400 block block mt-0.5 uppercase">
+                          ID: {dep.id} • {new Date(dep.createdAt).toLocaleString()}
+                        </span>
+                      </div>
+
+                      <span className={`text-[10px] font-black px-2.5 py-1 rounded-full uppercase tracking-wider ${
+                        dep.status === 'pending'
+                          ? 'bg-amber-100 text-amber-600'
+                          : dep.status === 'approved'
+                          ? 'bg-emerald-500/10 text-emerald-600'
+                          : 'bg-rose-100 text-rose-600'
+                      }`}>
+                        {dep.status === 'pending' ? 'Pending' : dep.status === 'approved' ? 'Approved' : 'Rejected'}
+                      </span>
+                    </div>
+
+                    <div className="grid grid-cols-2 gap-3 text-xs bg-slate-50 dark:bg-zinc-950 p-4 rounded-2xl border border-neutral-100 dark:border-neutral-850">
+                      <div>
+                        <span className="text-zinc-400 text-[10px] font-extrabold uppercase block leading-none">ক্রয়কৃত স্টারস</span>
+                        <span className="font-black text-amber-600 text-[13px] block mt-1.5 font-mono">⭐ {dep.starsCount} Stars</span>
+                      </div>
+                      
+                      <div>
+                        <span className="text-zinc-400 text-[10px] font-extrabold uppercase block leading-none">প্রদেয় টাকা</span>
+                        <span className="font-black text-slate-800 dark:text-zinc-200 text-[13px] block mt-1.5 font-mono">৳ {dep.amountBDT} BDT</span>
+                      </div>
+
+                      <div className="border-t border-neutral-200/50 dark:border-neutral-800 pt-2.5 mt-1">
+                        <span className="text-zinc-400 text-[10px] font-extrabold uppercase block leading-none">পেমেন্ট মেথড</span>
+                        <span className={`font-black block mt-1 uppercase ${dep.paymentMethod === 'bKash' ? 'text-[#D12053]' : 'text-[#EC5B24]'}`}>
+                          {dep.paymentMethod}
+                        </span>
+                      </div>
+
+                      <div className="border-t border-neutral-200/50 dark:border-neutral-800 pt-2.5 mt-1">
+                        <span className="text-zinc-400 text-[10px] font-extrabold uppercase block leading-none">প্রেরক নাম্বার</span>
+                        <span className="font-extrabold block font-mono mt-1 text-slate-700 dark:text-zinc-300">
+                          {dep.senderNumber}
+                        </span>
+                      </div>
+
+                      <div className="col-span-2 border-t border-neutral-200/50 dark:border-neutral-800 pt-2.5 mt-1">
+                        <span className="text-zinc-400 text-[10px] font-extrabold uppercase block leading-none">ট্রানজেকশন কীলক (TxnID)</span>
+                        <span className="font-black text-sm text-indigo-600 block mt-1 font-mono tracking-wide">
+                          {dep.transactionId}
+                        </span>
+                      </div>
+                    </div>
+
+                    {dep.screenshotUrl && (
+                      <div className="space-y-1">
+                        <span className="text-zinc-400 text-[10px] font-extrabold uppercase block pl-1">টাকা পাঠানোর স্ক্রিনশট</span>
+                        <div className="border border-neutral-200 dark:border-neutral-800 rounded-xl overflow-hidden max-h-56 bg-neutral-100">
+                          <img 
+                            src={dep.screenshotUrl} 
+                            alt="Payment Receipt" 
+                            className="w-full h-full object-contain hover:scale-105 transition duration-150" 
+                          />
+                        </div>
+                      </div>
+                    )}
+
+                    {dep.status === 'pending' && (
+                      <div className="flex justify-end gap-2 text-[10.5px] font-black pt-1">
+                        <button
+                          onClick={() => handleRejectDeposit(dep.dep_id || dep.id)}
+                          className="bg-rose-50 hover:bg-rose-100 text-rose-600 border border-rose-100 py-2.5 px-4.5 rounded-xl transition cursor-pointer"
+                        >
+                          Reject / বাতিল করুন
+                        </button>
+                        <button
+                          onClick={() => handleApproveDeposit(dep.dep_id || dep.id)}
+                          className="bg-emerald-500 hover:bg-emerald-600 text-white py-2.5 px-6 rounded-xl shadow-sm transition cursor-pointer flex items-center gap-1"
+                        >
+                          <CheckCircle className="w-4 h-4" />
+                          <span>Approve / তথ্য সঠিক</span>
                         </button>
                       </div>
                     )}
@@ -937,21 +1078,68 @@ function PostBoosterCard({ post }: { post: Post; key?: string }) {
   const [likes, setLikes] = React.useState(post.likesCount);
   const [comments, setComments] = React.useState(post.commentsCount);
   const [reachWeight, setReachWeight] = React.useState(post.reachWeight || 0);
+  const [boostPreset, setBoostPreset] = React.useState<'none' | '1m' | '5m' | '1h' | '12h' | '24h'>('none');
+  const [boostUntilState, setBoostUntilState] = React.useState(post.boostUntil || '');
   const [isUpdating, setIsUpdating] = React.useState(false);
+
+  // Check if post is currently boosted
+  const isCurrentlyBoosted = boostUntilState && new Date(boostUntilState).getTime() > Date.now();
+  const [timeLeft, setTimeLeft] = React.useState('');
+
+  React.useEffect(() => {
+    if (!boostUntilState) return;
+    const interval = setInterval(() => {
+      const diff = new Date(boostUntilState).getTime() - Date.now();
+      if (diff <= 0) {
+        setTimeLeft('Expired');
+        clearInterval(interval);
+      } else {
+        const mins = Math.floor((diff / 1000 / 60) % 60);
+        const hrs = Math.floor((diff / 1000 / 60 / 60) % 24);
+        const secs = Math.floor((diff / 1000) % 60);
+        setTimeLeft(`${hrs > 0 ? hrs + 'h ' : ''}${mins}m ${secs}s`);
+      }
+    }, 1000);
+    return () => clearInterval(interval);
+  }, [boostUntilState]);
 
   const handleUpdate = () => {
     setIsUpdating(true);
-    dbService.updatePostMetrics(post.id, likes, comments, reachWeight);
+    let calculatedBoostUntil: string | undefined = boostUntilState;
+
+    if (boostPreset === 'none') {
+      calculatedBoostUntil = ''; // Disable boost
+    } else {
+      let durationMs = 0;
+      if (boostPreset === '1m') durationMs = 1 * 60 * 1000;
+      else if (boostPreset === '5m') durationMs = 5 * 60 * 1000;
+      else if (boostPreset === '1h') durationMs = 60 * 60 * 1000;
+      else if (boostPreset === '12h') durationMs = 12 * 60 * 60 * 1000;
+      else if (boostPreset === '24h') durationMs = 24 * 60 * 60 * 1000;
+      
+      const targetTime = new Date(Date.now() + durationMs);
+      calculatedBoostUntil = targetTime.toISOString();
+    }
+
+    // Boosted posts automatically get boosted reachWeight (e.g. 1000) to bubble to the top!
+    const targetReach = boostPreset !== 'none' ? 1000 : reachWeight;
+
+    dbService.updatePostMetrics(post.id, likes, comments, targetReach, undefined, calculatedBoostUntil);
+    setBoostUntilState(calculatedBoostUntil || '');
+    if (boostPreset !== 'none') {
+      setReachWeight(1000);
+    }
+
     setTimeout(() => {
       setIsUpdating(false);
-      alert('সফলভাবে পোস্টের লাইক, কমেন্ট ও রিচ ওয়েট হালনাগাদ করা হয়েছে! 🚀🎯');
+      alert('সফলভাবে পোস্টের লাইক, কমেন্ট ও বুস্ট টাইমার আপডেট করা হয়েছে! 🚀🎯');
     }, 450);
   };
 
   const handleBumpToTop = () => {
     setIsUpdating(true);
     const now = new Date().toISOString();
-    dbService.updatePostMetrics(post.id, likes, comments, reachWeight, now);
+    dbService.updatePostMetrics(post.id, likes, comments, reachWeight, now, boostUntilState);
     setTimeout(() => {
       setIsUpdating(false);
       alert('সফলভাবে পোস্টটি সবার উপরে Bump করা হয়েছে! 🔝🔥');
@@ -968,18 +1156,69 @@ function PostBoosterCard({ post }: { post: Post; key?: string }) {
             <div className="w-12 h-12 bg-indigo-50 dark:bg-indigo-950 flex items-center justify-center text-[10px] text-indigo-500 rounded-xl font-black shrink-0">POST</div>
           )}
           <div className="min-w-0">
-            <p className="text-xs font-black text-slate-800 dark:text-neutral-200 truncate max-w-[250px]">{post.title || post.content || 'Untitled post'}</p>
+            <div className="flex items-center gap-1.5">
+              <p className="text-xs font-black text-slate-800 dark:text-neutral-200 truncate max-w-[120px]">{post.title || post.content || 'Untitled post'}</p>
+              {isCurrentlyBoosted && (
+                <span className="bg-amber-500 text-white font-black text-[7.5px] px-1.5 py-0.5 rounded-full uppercase tracking-wider animate-pulse">
+                  SPONSORED
+                </span>
+              )}
+            </div>
             <p className="text-[10px] text-zinc-400 mt-0.5">ক্রিয়েটর: <span className="font-bold text-amber-600">{post.authorName}</span></p>
           </div>
         </div>
 
-        <button
-          onClick={handleBumpToTop}
-          className="text-[9px] font-black px-2.5 py-1.5 bg-amber-500 hover:bg-amber-600 text-white rounded-lg transition active:scale-95 duration-100 flex items-center gap-1 cursor-pointer"
-          title="পোস্টটি সবার উপরে নিয়ে আসুন"
-        >
-          <span>🔝</span> সবার উপরে তুলুন (Bump)
-        </button>
+        <div className="flex items-center gap-1.5">
+          {isCurrentlyBoosted && timeLeft !== 'Expired' && (
+            <span className="text-[10px] font-mono font-bold text-amber-600 bg-amber-50 dark:bg-amber-950/20 px-2 py-1 rounded-lg">
+              ⏱️ {timeLeft} বাকি
+            </span>
+          )}
+          <button
+            onClick={handleBumpToTop}
+            className="text-[9px] font-black px-2.5 py-1.5 bg-amber-500 hover:bg-amber-600 text-white rounded-lg transition active:scale-95 duration-100 flex items-center gap-1 cursor-pointer"
+            title="পোস্টটি সবার উপরে নিয়ে আসুন"
+          >
+            <span>🔝</span> সবার উপরে তুলুন (Bump)
+          </button>
+        </div>
+      </div>
+
+      {/* Boost timer selection controls */}
+      <div className="bg-slate-50 dark:bg-zinc-950 border border-neutral-150 dark:border-neutral-850 p-3.5 rounded-xl space-y-2 text-xs">
+        <label className="text-[9.5px] font-black text-slate-500 uppercase tracking-wider block">
+          🚀 স্পনসর বুস্ট টাইমার সেট করুন (Boost Until Sponsored Timer):
+        </label>
+        
+        <div className="grid grid-cols-3 sm:grid-cols-6 gap-1.5">
+          {[
+            { value: 'none', label: 'No Boost' },
+            { value: '1m', label: '1 Min (Test)' },
+            { value: '5m', label: '5 Min' },
+            { value: '1h', label: '1 Hour' },
+            { value: '12h', label: '12 Hour' },
+            { value: '24h', label: '1 Day' },
+          ].map((preset) => (
+            <button
+              key={preset.value}
+              type="button"
+              onClick={() => setBoostPreset(preset.value as any)}
+              className={`py-1 px-1.5 text-[9px] font-black rounded-lg border text-center transition cursor-pointer select-none ${
+                boostPreset === preset.value
+                  ? 'bg-amber-500 text-white border-amber-500'
+                  : 'bg-white dark:bg-neutral-900 text-slate-600 dark:text-zinc-400 border-neutral-250 dark:border-neutral-800'
+              }`}
+            >
+              {preset.label}
+            </button>
+          ))}
+        </div>
+        
+        {boostUntilState && (
+          <p className="text-[9px] text-zinc-400 select-none">
+            বুস্ট শেষ হবেঃ <b className="font-mono text-zinc-600 dark:text-zinc-300">{new Date(boostUntilState).toLocaleString()}</b>
+          </p>
+        )}
       </div>
 
       <div className="flex flex-wrap items-center justify-between gap-3 pt-1">
@@ -1038,7 +1277,7 @@ function PostBoosterCard({ post }: { post: Post; key?: string }) {
             onClick={() => setReachWeight(500)}
             className={`px-2.5 py-1 text-[9px] font-black rounded-lg transition-all cursor-pointer ${
               reachWeight > 0 
-                ? 'bg-[#11af5f] text-white shadow-xs animate-pulse' 
+                ? 'bg-[#11af5f] text-white shadow-xs' 
                 : 'text-zinc-500 hover:bg-neutral-150 dark:hover:bg-neutral-800'
             }`}
           >
