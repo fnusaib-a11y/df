@@ -220,3 +220,19 @@ export interface FriendRequest {
   createdAt: string;
 }
 
+export interface StarDepositRequest {
+  id: string;
+  userId: string;
+  userName: string;
+  userPhone: string;
+  starsCount: number;
+  amountBDT: number;
+  paymentMethod: 'bKash' | 'Nagad';
+  senderNumber: string;
+  transactionId: string;
+  screenshotUrl?: string; // base64 or placeholder
+  status: 'pending' | 'approved' | 'rejected';
+  createdAt: string;
+}
+
+
