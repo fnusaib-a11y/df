@@ -4,10 +4,11 @@
  */
 
 import React from 'react';
-import { Settings, Camera, UserCheck, Shield, CheckCircle, Award, X, Mail, Sparkles, Image as ImageIcon } from 'lucide-react';
+import { Settings, Camera, UserCheck, Shield, CheckCircle, Award, X, Mail, Sparkles, Image as ImageIcon, ArrowLeft, MessageSquare, UserPlus, UserMinus } from 'lucide-react';
 import { UserProfile, Post } from '../types';
 import { dbService } from '../services/db';
 import { VerifiedBadge } from './VerifiedBadge';
+import { useOnlineStatus } from '../hooks/useOnlineStatus';
 
 interface ProfileViewProps {
   onNavigate: (screen: string) => void;
@@ -16,6 +17,7 @@ interface ProfileViewProps {
   onEditProfileClose?: () => void;
   onPostSelect?: (post: Post) => void;
   onChatWithUser?: (userId: string) => void;
+  userId?: string;
 }
 
 const PRESET_AVATARS = [
@@ -33,9 +35,19 @@ const PRESET_COVERS = [
   { name: '🌆 Neon', url: 'https://images.unsplash.com/photo-1513542789411-b6a5d4f31634?auto=format&fit=crop&w=800&q=80' }
 ];
 
-export default function ProfileView({ onNavigate, onEditProfile, editProfileOpen, onEditProfileClose, onPostSelect, onChatWithUser }: ProfileViewProps) {
-  const [currentUser, setCurrentUser] = React.useState<UserProfile>(dbService.getCurrentUser());
+export default function ProfileView({ onNavigate, onEditProfile, editProfileOpen, onEditProfileClose, onPostSelect, onChatWithUser, userId }: ProfileViewProps) {
+  const loggedInUser = dbService.getCurrentUser();
+  const isOwnProfile = !userId || userId === loggedInUser?.id;
+
+  const [currentUser, setCurrentUser] = React.useState<UserProfile>(() => {
+    if (userId && userId !== loggedInUser?.id) {
+      const target = dbService.getUserById(userId);
+      if (target) return target;
+    }
+    return loggedInUser;
+  });
   const [myPosts, setMyPosts] = React.useState<Post[]>([]);
+  const isOnline = useOnlineStatus();
   
   // Profile edit form fields state
   const [isEditing, setIsEditing] = React.useState(false);
@@ -50,6 +62,17 @@ export default function ProfileView({ onNavigate, onEditProfile, editProfileOpen
     const posts = dbService.getPosts('সব').filter(p => p.authorId === currentUser.id);
     setMyPosts(posts);
   }, [currentUser]);
+
+  React.useEffect(() => {
+    if (userId && userId !== loggedInUser?.id) {
+      const target = dbService.getUserById(userId);
+      if (target) {
+        setCurrentUser(target);
+      }
+    } else {
+      if (loggedInUser) setCurrentUser(loggedInUser);
+    }
+  }, [userId]);
 
   React.useEffect(() => {
     if (editProfileOpen) {
@@ -163,12 +186,19 @@ export default function ProfileView({ onNavigate, onEditProfile, editProfileOpen
     }
   };
 
-  // Helper to re-read current user profile instantly or on interval polling
+  // Helper to re-read user profile instantly or on interval polling
   React.useEffect(() => {
     const handleReload = () => {
-      const upToDateUser = dbService.getCurrentUser();
-      if (upToDateUser) {
-        setCurrentUser(upToDateUser);
+      if (userId && userId !== dbService.getCurrentUser()?.id) {
+        const friendUser = dbService.getUserById(userId);
+        if (friendUser) {
+          setCurrentUser(friendUser);
+        }
+      } else {
+        const upToDateUser = dbService.getCurrentUser();
+        if (upToDateUser) {
+          setCurrentUser(upToDateUser);
+        }
       }
     };
     
@@ -178,20 +208,46 @@ export default function ProfileView({ onNavigate, onEditProfile, editProfileOpen
       window.removeEventListener('starconnect_db_update', handleReload);
       clearInterval(interval);
     };
-  }, []);
+  }, [userId]);
+
+  // Determine friendship state
+  const loggedInId = dbService.getCurrentUser()?.id;
+  const matchRequest = loggedInId ? dbService.getFriendRequests().find(fr => 
+    (fr.senderId === loggedInId && fr.receiverId === currentUser.id) ||
+    (fr.senderId === currentUser.id && fr.receiverId === loggedInId)
+  ) : null;
+
+  const isFriend = matchRequest?.status === 'accepted';
+  const isPendingSent = matchRequest?.status === 'pending' && matchRequest.senderId === loggedInId;
+  const isPendingReceived = matchRequest?.status === 'pending' && matchRequest.receiverId === loggedInId;
 
   return (
     <div className="flex-1 flex flex-col overflow-y-auto bg-white dark:bg-neutral-950 pb-16">
       {/* Top Header */}
       <div className="flex justify-between items-center px-4 py-3 sticky top-0 bg-white dark:bg-neutral-950 z-10 border-b border-neutral-100 dark:border-neutral-900">
-        <h1 className="text-base font-extrabold text-slate-900 dark:text-white tracking-tight">Profile</h1>
-        <button
-          onClick={() => onNavigate('SETTINGS')}
-          className="p-1.5 rounded-full hover:bg-neutral-100 dark:hover:bg-neutral-900 transition cursor-pointer"
-          aria-label="Settings"
-        >
-          <Settings className="w-6 h-6 text-neutral-800 dark:text-neutral-200" />
-        </button>
+        <div className="flex items-center gap-2">
+          {!isOwnProfile && (
+            <button
+              onClick={() => onNavigate('FEED')}
+              className="p-1.5 hover:bg-neutral-100 dark:hover:bg-neutral-900 rounded-lg mr-1 text-slate-800 dark:text-neutral-200 cursor-pointer flex items-center gap-1 text-xs font-bold"
+            >
+              <ArrowLeft className="w-4 h-4 text-emerald-500" />
+              <span>ফিরে যান (Back)</span>
+            </button>
+          )}
+          <h1 className="text-base font-extrabold text-slate-900 dark:text-white tracking-tight">
+            {isOwnProfile ? 'আমার প্রোফাইল (My Profile)' : `${currentUser.name}-এর প্রোফাইল`}
+          </h1>
+        </div>
+        {isOwnProfile && (
+          <button
+            onClick={() => onNavigate('SETTINGS')}
+            className="p-1.5 rounded-full hover:bg-neutral-100 dark:hover:bg-neutral-900 transition cursor-pointer"
+            aria-label="Settings"
+          >
+            <Settings className="w-6 h-6 text-neutral-800 dark:text-neutral-200" />
+          </button>
+        )}
       </div>
 
       {/* Cover and Profile Image Section */}
@@ -220,12 +276,21 @@ export default function ProfileView({ onNavigate, onEditProfile, editProfileOpen
                 }}
               />
             </div>
-            <button
-              onClick={onEditProfile}
-              className="absolute bottom-1 right-1 bg-amber-500 text-white p-1.5 rounded-full border-2 border-white dark:border-neutral-950 shadow hover:scale-105 active:scale-95 transition cursor-pointer"
-            >
-              <Camera className="w-4 h-4" />
-            </button>
+            {/* Realtime active status indicator dot */}
+            <div 
+              className={`absolute top-1 left-1 w-5 h-5 rounded-full border-2 border-white dark:border-neutral-950 shadow-md z-10 ${
+                isOnline ? 'bg-emerald-500' : 'bg-zinc-300 dark:bg-zinc-700'
+              }`} 
+              title={isOnline ? 'Online' : 'Offline'}
+            ></div>
+            {isOwnProfile && (
+              <button
+                onClick={onEditProfile}
+                className="absolute bottom-1 right-1 bg-amber-500 text-white p-1.5 rounded-full border-2 border-white dark:border-neutral-950 shadow hover:scale-105 active:scale-95 transition cursor-pointer"
+              >
+                <Camera className="w-4 h-4" />
+              </button>
+            )}
           </div>
         </div>
       </div>
@@ -270,20 +335,80 @@ export default function ProfileView({ onNavigate, onEditProfile, editProfileOpen
 
       {/* Action Buttons */}
       <div className="flex gap-3 px-4 mt-5">
-        <button
-          onClick={onEditProfile}
-          className="flex-1 bg-amber-500 text-white text-sm font-semibold py-3 px-4 rounded-xl shadow-md space-x-1 hover:bg-amber-600 active:scale-95 transition flex items-center justify-center cursor-pointer"
-        >
-          <Camera className="w-4 h-4 mr-1" />
-          <span>Edit Profile</span>
-        </button>
-        <button
-          onClick={() => onNavigate('FRIEND_FINDER')}
-          className="flex-1 bg-white dark:bg-neutral-900 border border-neutral-200 dark:border-neutral-800 text-neutral-800 dark:text-neutral-200 text-sm font-semibold py-3 px-4 rounded-xl flex items-center justify-center gap-1.5 hover:bg-neutral-50 dark:hover:bg-neutral-800 transition active:scale-95 cursor-pointer"
-        >
-          <UserCheck className="w-4 h-4" />
-          <span>Find Friends</span>
-        </button>
+        {isOwnProfile ? (
+          <>
+            <button
+              onClick={onEditProfile}
+              className="flex-1 bg-amber-500 text-white text-sm font-semibold py-3 px-4 rounded-xl shadow-md space-x-1 hover:bg-amber-600 active:scale-95 transition flex items-center justify-center cursor-pointer"
+            >
+              <Camera className="w-4 h-4 mr-1" />
+              <span>Edit Profile</span>
+            </button>
+            <button
+              onClick={() => onNavigate('FRIEND_FINDER')}
+              className="flex-1 bg-white dark:bg-neutral-900 border border-neutral-200 dark:border-neutral-800 text-neutral-800 dark:text-neutral-200 text-sm font-semibold py-3 px-4 rounded-xl flex items-center justify-center gap-1.5 hover:bg-neutral-50 dark:hover:bg-neutral-800 transition active:scale-95 cursor-pointer"
+            >
+              <UserCheck className="w-4 h-4" />
+              <span>Find Friends</span>
+            </button>
+          </>
+        ) : (
+          <>
+            {onChatWithUser && (
+              <button
+                onClick={() => onChatWithUser(currentUser.id)}
+                className="flex-1 bg-amber-500 hover:bg-amber-600 text-white text-sm font-semibold py-3 px-4 rounded-xl shadow-md flex items-center justify-center gap-1.5 active:scale-95 transition cursor-pointer"
+              >
+                <MessageSquare className="w-4 h-4 mr-1" />
+                <span>বার্তা পাঠান (Message)</span>
+              </button>
+            )}
+
+            {isFriend ? (
+              <button
+                onClick={() => {
+                  if (window.confirm(`${currentUser.name}-কে বন্ধুর তালিকা থেকে সরাতে চান?`)) {
+                    dbService.unfriend(currentUser.id);
+                  }
+                }}
+                className="flex-1 bg-zinc-150 dark:bg-zinc-800 text-zinc-800 dark:text-zinc-200 border border-neutral-200 dark:border-neutral-700 text-sm font-semibold py-3 px-4 rounded-xl flex items-center justify-center gap-1.5 hover:bg-zinc-200 transition active:scale-95 cursor-pointer"
+              >
+                <UserMinus className="w-4 h-4 text-rose-550" />
+                <span>বন্ধুর তালিকা থেকে বাদ দিন</span>
+              </button>
+            ) : isPendingSent ? (
+              <button
+                onClick={() => {
+                  if (matchRequest) dbService.cancelFriendRequest(matchRequest.id);
+                }}
+                className="flex-1 bg-amber-50 dark:bg-neutral-900 text-amber-600 border border-amber-200 dark:border-amber-900/60 text-sm font-semibold py-3 px-4 rounded-xl flex items-center justify-center gap-1.5 hover:opacity-90 transition active:scale-95 cursor-pointer"
+              >
+                <UserMinus className="w-4 h-4" />
+                <span>অনুরোধ বাতিল (Cancel)</span>
+              </button>
+            ) : isPendingReceived ? (
+              <button
+                onClick={() => {
+                  if (matchRequest) dbService.acceptFriendRequest(matchRequest.id);
+                }}
+                className="flex-1 bg-emerald-500 hover:bg-emerald-600 text-white text-sm font-semibold py-3 px-4 rounded-xl flex items-center justify-center gap-1.5 transition active:scale-95 shadow-sm cursor-pointer"
+              >
+                <UserCheck className="w-4 h-4" />
+                <span>অনুমোদন করুন (Accept)</span>
+              </button>
+            ) : (
+              <button
+                onClick={() => {
+                  dbService.sendFriendRequest(currentUser.id);
+                }}
+                className="flex-1 bg-white dark:bg-neutral-900 border border-neutral-250 dark:border-neutral-800 text-slate-850 dark:text-zinc-200 text-sm font-semibold py-3 px-4 rounded-xl flex items-center justify-center gap-1.5 hover:bg-slate-50 dark:hover:bg-neutral-800 transition active:scale-95 cursor-pointer"
+              >
+                <UserPlus className="w-4 h-4 text-[#11af5f]" />
+                <span>বন্ধু হোন (Add Friend)</span>
+              </button>
+            )}
+          </>
+        )}
       </div>
 
       {/* Posts list grid */}

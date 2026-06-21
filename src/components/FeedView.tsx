@@ -4,7 +4,7 @@
  */
 
 import React from 'react';
-import { Search, Bell, Heart, MessageCircle, Share2, MoreHorizontal, CheckCircle2, ShieldAlert, Sparkles, Send, Lock, Gift, Coins, AlertCircle } from 'lucide-react';
+import { Search, Bell, Heart, MessageCircle, Share2, MoreHorizontal, CheckCircle2, ShieldAlert, Sparkles, Send, Lock, Gift, Coins, AlertCircle, X } from 'lucide-react';
 import { Post, Comment, Story, UserProfile, NotificationItem } from '../types';
 import { dbService } from '../services/db';
 import { VerifiedBadge } from './VerifiedBadge';
@@ -75,6 +75,7 @@ export default function FeedView({ onNavigate, onUserSelect, onMessageUser }: Fe
   const [selectedPostOptions, setSelectedPostOptions] = React.useState<Post | null>(null);
   const [showReportForm, setShowReportForm] = React.useState(false);
   const [reportReason, setReportReason] = React.useState('');
+  const [sharingPost, setSharingPost] = React.useState<Post | null>(null);
 
   // Notifications states
   const [notifications, setNotifications] = React.useState<NotificationItem[]>([]);
@@ -873,6 +874,28 @@ export default function FeedView({ onNavigate, onUserSelect, onMessageUser }: Fe
                   </p>
                 </div>
 
+                {/* Shared Post Container Reference */}
+                {post.sharedPostId && (
+                  <div className="border border-neutral-100 dark:border-neutral-800 rounded-2xl p-3.5 bg-neutral-50 dark:bg-neutral-900/60 text-left space-y-2 mt-1 animate-fadeIn mx-0.5">
+                    <div className="flex items-center gap-1.5">
+                      <span className="text-[9px] font-black text-[#11af5f] dark:text-emerald-400 bg-emerald-500/10 px-1.5 py-0.5 rounded uppercase tracking-wider block">
+                        মূল পোস্ট (Original)
+                      </span>
+                      <span className="text-xs font-black text-slate-800 dark:text-zinc-200">
+                        @{post.sharedPostAuthorName}
+                      </span>
+                    </div>
+                    {post.title && (
+                      <h4 className="text-[11.5px] font-extrabold text-neutral-800 dark:text-neutral-200 leading-snug">
+                        {post.title.replace('Shared: ', '')}
+                      </h4>
+                    )}
+                    <p className="text-[10.5px] text-zinc-500 dark:text-zinc-400 font-medium leading-relaxed italic">
+                      "এখানে উপরে সংযুক্ত করা ছবিটি বা ভিডিওটি পূর্বে ওনার দ্বারা প্রকাশিত।"
+                    </p>
+                  </div>
+                )}
+
                 {/* PREMIUM LOCK/UNLOCK INTERFACES */}
                 {post.mediaUrl && (
                   <div className={`relative rounded-2xl overflow-hidden bg-neutral-900 border border-neutral-200 dark:border-neutral-800 flex items-center justify-center ${
@@ -966,7 +989,7 @@ export default function FeedView({ onNavigate, onUserSelect, onMessageUser }: Fe
                   )}
 
                   <button
-                    onClick={() => handleSharePostLink(post)}
+                    onClick={() => setSharingPost(post)}
                     className="p-2 bg-slate-50 dark:bg-zinc-800 hover:bg-slate-100 dark:hover:bg-zinc-700 border border-neutral-100 dark:border-neutral-800 text-slate-500 dark:text-zinc-300 rounded-xl flex items-center justify-center shrink-0 cursor-pointer active:scale-98"
                   >
                     <Share2 className="w-4 h-4" />
@@ -1379,6 +1402,125 @@ export default function FeedView({ onNavigate, onUserSelect, onMessageUser }: Fe
               </button>
             </div>
           )}
+        </div>
+      )}
+
+      {/* Dynamic Multiple Share Options Modal (মোবাইল ড্রয়ার স্টাইল) */}
+      {sharingPost && (
+        <div className="fixed inset-0 bg-black/60 z-50 flex items-end sm:items-center justify-center p-0 sm:p-4 backdrop-blur-sm animate-fadeIn">
+          <div className="bg-white dark:bg-neutral-900 w-full sm:max-w-md rounded-t-[28px] sm:rounded-[28px] overflow-hidden shadow-2xl flex flex-col max-h-[90vh] pb-6">
+            
+            {/* Modal Header */}
+            <div className="flex items-center justify-between px-6 py-4 border-b border-neutral-150 dark:border-neutral-800 shrink-0">
+              <div className="flex items-center gap-2">
+                <Share2 className="w-5 h-5 text-emerald-500" />
+                <span className="font-extrabold text-slate-800 dark:text-neutral-100 text-[13px]">শেয়ার করুন (Share Post)</span>
+              </div>
+              <button
+                onClick={() => setSharingPost(null)}
+                className="p-1.5 rounded-full hover:bg-neutral-100 dark:hover:bg-neutral-800 transition text-neutral-500 cursor-pointer"
+              >
+                <X className="w-5 h-5" />
+              </button>
+            </div>
+
+            {/* Modal Body / Share Options list */}
+            <div className="p-5 space-y-4 text-left overflow-y-auto">
+              <span className="text-[9px] font-black text-neutral-400 dark:text-neutral-500 uppercase tracking-widest block mb-1">
+                শেয়ার করার মাধ্যমসমূহ (Multiple Options)
+              </span>
+
+              <div className="grid grid-cols-1 gap-2.5">
+                {/* 1. Share to profile/wall */}
+                <button
+                  onClick={() => {
+                    const success = dbService.sharePostToMyFeed(sharingPost.id);
+                    if (success) {
+                      alert(`🎉 সফলভাবে আপনার প্রোফাইল ওয়ালে পোস্টটি শেয়ার করা হয়েছে!`);
+                      setSharingPost(null);
+                      loadFeedData();
+                    } else {
+                      alert('Post share failed.');
+                    }
+                  }}
+                  className="w-full flex items-center justify-between p-4 bg-emerald-500/10 hover:bg-emerald-500/15 border border-emerald-500/25 rounded-2xl transition text-left cursor-pointer active:scale-99"
+                >
+                  <div className="flex gap-3 items-center">
+                    <div className="w-9 h-9 bg-emerald-500 text-white rounded-xl flex items-center justify-center shadow shadow-emerald-500/30 shrink-0">
+                      <Share2 className="w-4 h-4" />
+                    </div>
+                    <div>
+                      <h4 className="text-[12.5px] font-extrabold text-emerald-700 dark:text-emerald-400">নিজের প্রোফাইলে শেয়ার করুন</h4>
+                      <p className="text-[10px] font-semibold text-zinc-400 dark:text-zinc-500 leading-none mt-0.5">আপনার রি-পোস্ট এবং ওয়ালে চলে আসবে</p>
+                    </div>
+                  </div>
+                  <span className="text-emerald-600 font-extrabold text-[11px] shrink-0">১-ক্লিক →</span>
+                </button>
+
+                {/* 2. Copy Link */}
+                <button
+                  onClick={() => {
+                    const link = `${window.location.origin}/posts/${sharingPost.id}`;
+                    navigator.clipboard.writeText(link).then(() => {
+                      alert(`🔗 লিংক ক্লিপবোর্ডে কপি করা হয়েছে:\n${link}`);
+                      setSharingPost(null);
+                    }).catch(() => {
+                      alert(`🔗 লিংকটি নিম্নরূপ:\n${link}`);
+                      setSharingPost(null);
+                    });
+                  }}
+                  className="w-full flex items-center justify-between p-3.5 bg-neutral-50 hover:bg-neutral-100 dark:bg-neutral-850 dark:hover:bg-neutral-800 border border-neutral-200/50 dark:border-neutral-850 rounded-2xl transition text-left cursor-pointer active:scale-99"
+                >
+                  <div className="flex gap-3 items-center">
+                    <div className="w-9 h-9 bg-neutral-205 dark:bg-zinc-800 text-neutral-800 dark:text-neutral-200 rounded-xl flex items-center justify-center shrink-0">
+                      <Send className="w-4 h-4 text-sky-500" />
+                    </div>
+                    <div>
+                      <h4 className="text-xs font-extrabold text-slate-800 dark:text-zinc-200">লিংক কপি করুন (Copy Link)</h4>
+                      <p className="text-[10px] text-zinc-400 dark:text-zinc-500 font-medium leading-none mt-0.5">খুব সহজেই বন্ধুদের মেসেজ বক্সে পাঠান</p>
+                    </div>
+                  </div>
+                  <span className="text-[10px] font-extrabold text-zinc-400 shrink-0">কপি</span>
+                </button>
+
+                {/* 3. Send via messenger direct message to friend */}
+                <div className="border border-neutral-200/60 dark:border-neutral-800 rounded-2xl p-4 bg-neutral-50/50 dark:bg-neutral-900/40 space-y-3">
+                  <h5 className="text-[9.5px] font-black text-zinc-400 dark:text-zinc-500 uppercase tracking-wider block">
+                    সরাসরি মেসেঞ্জারে পাঠান (Send to Friends)
+                  </h5>
+                  
+                  {/* Select friend and send message */}
+                  <div className="max-h-36 overflow-y-auto space-y-1.5 scrollbar-thin pr-1">
+                    {dbService.getUsers().filter(u => u.id !== myProfile.id).length === 0 ? (
+                      <p className="text-[10.5px] text-zinc-400 font-semibold italic text-center py-2">কোনো বন্ধু পাওয়া যায়নি</p>
+                    ) : (
+                      dbService.getUsers().filter(u => u.id !== myProfile.id).map(friend => (
+                        <div key={friend.id} className="flex justify-between items-center bg-white dark:bg-neutral-900 p-2 rounded-xl border border-neutral-100 dark:border-neutral-800/80 shadow-xs">
+                          <div className="flex items-center gap-2">
+                            <div className="w-7 h-7 rounded-full overflow-hidden border border-neutral-200 shrink-0">
+                              <img src={friend.avatarUrl} alt="" className="w-full h-full object-cover" />
+                            </div>
+                            <span className="text-[11px] font-extrabold text-slate-800 dark:text-zinc-200 truncate max-w-[120px]">{friend.name}</span>
+                          </div>
+                          <button
+                            onClick={() => {
+                              const link = `${window.location.origin}/posts/${sharingPost.id}`;
+                              dbService.sendMessage(friend.id, `আপনার সাথে এই পোস্টটি শেয়ার করেছে: \n${sharingPost.title || 'পোস্ট'} \nলিংক: ${link}`);
+                              alert(`✉️ সফলভাবে "${friend.name}"-কে ইনবক্সে পোস্ট পাঠানো হয়েছে!`);
+                              setSharingPost(null);
+                            }}
+                            className="bg-sky-500 hover:bg-sky-600 text-white text-[9px] font-black px-2.5 py-1 rounded-lg cursor-pointer"
+                          >
+                            পাঠান (Send)
+                          </button>
+                        </div>
+                      ))
+                    )}
+                  </div>
+                </div>
+              </div>
+            </div>
+          </div>
         </div>
       )}
 

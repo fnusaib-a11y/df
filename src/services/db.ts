@@ -1916,6 +1916,73 @@ class StarConnectDatabaseService {
     return newPost;
   }
 
+  sharePostToMyFeed(postId: string): boolean {
+    const me = this.cache.currentUser;
+    if (!me) return false;
+
+    const originalPost = this.cache.posts.find(p => p.id === postId);
+    if (!originalPost) return false;
+
+    // Increment original sharesCount
+    originalPost.sharesCount = (originalPost.sharesCount || 0) + 1;
+    if (this.isFirebaseReady && this.db) {
+      setDoc(doc(this.db, 'posts', originalPost.id), this.cleanForFirestore(originalPost)).catch(console.warn);
+    }
+
+    // Create shared post
+    const newPostId = 'post_shared_' + Math.random().toString(36).substr(2, 9);
+    const sharedPost: Post = {
+      id: newPostId,
+      authorId: me.id,
+      authorName: me.name,
+      authorAvatarUrl: me.avatarUrl,
+      authorIsVerified: me.isVerified,
+      title: originalPost.title ? `Shared: ${originalPost.title}` : `Shared a post`,
+      content: `শেয়ার করেছেন - ${originalPost.authorName}-এর পোস্ট`,
+      mediaUrl: originalPost.mediaUrl,
+      mediaType: originalPost.mediaType,
+      category: originalPost.category || 'সব',
+      tags: originalPost.tags || [],
+      isReel: false,
+      likesCount: 0,
+      commentsCount: 0,
+      sharesCount: 0,
+      likedBy: [],
+      createdAt: new Date().toISOString(),
+      isPremiumPost: false,
+      starPrice: 0,
+      unlockedByUserIds: [],
+      lastActiveAt: new Date().toISOString(),
+      reachWeight: 0,
+      sharedPostId: originalPost.id,
+      sharedPostAuthorName: originalPost.authorName
+    };
+
+    this.cache.posts.unshift(sharedPost);
+    me.postsCount++;
+    this.updateUserRecord(me);
+    this.sync();
+
+    // Notify original author
+    if (originalPost.authorId !== me.id) {
+      this.addNotification(
+        originalPost.authorId,
+        me.id,
+        me.name,
+        me.avatarUrl,
+        'friend_accept',
+        `shared your post: "${originalPost.title || 'post'}"`
+      );
+    }
+
+    if (this.isFirebaseReady && this.db) {
+      setDoc(doc(this.db, 'posts', newPostId), this.cleanForFirestore(sharedPost)).catch(console.warn);
+    }
+
+    window.dispatchEvent(new CustomEvent('starconnect_db_update'));
+    return true;
+  }
+
   private isFollowingCheck(followerId: string, followingId: string): boolean {
     return localStorage.getItem(`follow_${followerId}_${followingId}`) === 'true';
   }
@@ -2461,6 +2528,20 @@ class StarConnectDatabaseService {
 
     this.sync();
     window.dispatchEvent(new CustomEvent('starconnect_db_update'));
+  }
+
+  public rewardEcoStars(userId: string, amount: number, taskId: string, taskName: string): boolean {
+    const user = this.cache.users.find(u => u.id === userId);
+    if (!user) return false;
+
+    user.starBalance = (user.starBalance || 0) + amount;
+    user.totalStarsEarned = (user.totalStarsEarned || 0) + amount;
+    
+    this.addTransaction(userId, 'eco_earn', amount, undefined, taskId, taskName);
+    this.updateUserRecord(user);
+    this.sync();
+    window.dispatchEvent(new CustomEvent('starconnect_db_update'));
+    return true;
   }
 
   banUser(userId: string) {

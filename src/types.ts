@@ -99,6 +99,8 @@ export interface Post {
   lastActiveAt?: string; // Facebook-like sorting: bump on comment or interaction
   reachWeight?: number; // Admin panel control: up or down reach multiplier
   boostUntil?: string; // ISO timestamp until which the post is boosted / Sponsored
+  sharedPostId?: string; // ID of the original post if reshared
+  sharedPostAuthorName?: string; // Name of the original post author
 }
 
 export interface Comment {
@@ -202,7 +204,7 @@ export interface WithdrawalRequest {
 export interface TransactionItem {
   id: string;
   userId: string;
-  type: 'buy_stars' | 'send_gift' | 'receive_gift' | 'unlock_post' | 'post_earn' | 'withdraw';
+  type: 'buy_stars' | 'send_gift' | 'receive_gift' | 'unlock_post' | 'post_earn' | 'withdraw' | 'eco_earn';
   amountStars: number;
   amountBDT?: number;
   referenceId?: string; // target user or post

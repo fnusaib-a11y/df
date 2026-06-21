@@ -4,7 +4,7 @@
  */
 
 import React from 'react';
-import { ArrowLeft, Wallet, TrendingUp, ArrowUpRight, ArrowDownLeft, Gift, Lock, RefreshCw, Smartphone } from 'lucide-react';
+import { ArrowLeft, Wallet, TrendingUp, ArrowUpRight, ArrowDownLeft, Gift, Lock, RefreshCw, Smartphone, Leaf, Sparkles } from 'lucide-react';
 import { dbService } from '../services/db';
 import { TransactionItem, UserProfile } from '../types';
 
@@ -17,6 +17,7 @@ export default function WalletView({ onBack, onNavigate }: WalletViewProps) {
   const [profile, setProfile] = React.useState<UserProfile | null>(null);
   const [transactions, setTransactions] = React.useState<TransactionItem[]>([]);
   const [isRefreshing, setIsRefreshing] = React.useState(false);
+  const [completedEcoTasks, setCompletedEcoTasks] = React.useState<string[]>([]);
 
   const loadData = () => {
     const user = dbService.getCurrentUser();
@@ -31,6 +32,37 @@ export default function WalletView({ onBack, onNavigate }: WalletViewProps) {
     window.addEventListener('starconnect_db_update', loadData);
     return () => window.removeEventListener('starconnect_db_update', loadData);
   }, []);
+
+  // Sync completed tasks when profile.id changes
+  React.useEffect(() => {
+    if (profile?.id) {
+      try {
+        const saved = localStorage.getItem(`eco_completed_${profile.id}`);
+        setCompletedEcoTasks(saved ? JSON.parse(saved) : []);
+      } catch (e) {
+        setCompletedEcoTasks([]);
+      }
+    }
+  }, [profile?.id]);
+
+  const handleClaimEcoTask = (taskId: string, points: number, taskName: string) => {
+    if (!profile) return;
+    const isCompleted = completedEcoTasks.includes(taskId);
+    if (isCompleted) return;
+
+    const success = dbService.rewardEcoStars(profile.id, points, taskId, taskName);
+    if (success) {
+      const updated = [...completedEcoTasks, taskId];
+      setCompletedEcoTasks(updated);
+      try {
+        localStorage.setItem(`eco_completed_${profile.id}`, JSON.stringify(updated));
+      } catch (e) {
+        console.warn(e);
+      }
+      alert(`🎉 অভিনন্দন! আপনি সফলভাবে "${taskName}" সম্পূর্ণ করেছেন এবং পেয়ে গেছেন ${points} স্টার বোনাস! 🌟`);
+      loadData();
+    }
+  };
 
   const handleRefresh = () => {
     setIsRefreshing(true);
@@ -196,6 +228,93 @@ export default function WalletView({ onBack, onNavigate }: WalletViewProps) {
           </div>
         </div>
 
+        {/* Eco Earning System (ইকো আর্নিং সিস্টেম) */}
+        <div className="bg-gradient-to-br from-emerald-500/10 via-teal-500/5 to-transparent border border-emerald-500/20 dark:border-emerald-500/15 rounded-[24px] p-5 shadow-sm space-y-4 text-left">
+          <div className="flex justify-between items-center">
+            <h2 className="text-xs font-black text-emerald-600 dark:text-emerald-400 uppercase tracking-widest flex items-center gap-1.5">
+              <Leaf className="w-4 h-4 text-emerald-500 animate-bounce" />
+              <span>ইকো আর্নিং হাব (Eco Earning)</span>
+            </h2>
+            <span className="text-[9px] bg-emerald-500/20 text-emerald-700 dark:text-emerald-400 font-extrabold px-2 py-0.5 rounded-full flex items-center gap-1">
+              <Sparkles className="w-3 h-3 animate-spin" /> Live Rewards
+            </span>
+          </div>
+
+          <p className="text-xs text-zinc-500 dark:text-zinc-400 leading-relaxed font-semibold">
+            প্রতিদিনের সহজ সবুজ পরিবেশ-বান্ধব কাজগুলো সম্পূর্ণ করুন এবং সরাসরি **ফ্রি স্টার (⭐ STARS)** উপার্জন করুন! আমাদের পরিবেশ রক্ষা করুন, সাথে আয় করুন।
+          </p>
+
+          <div className="space-y-3 pt-1">
+            {[
+              {
+                id: 'eco_energy',
+                title: 'বিদ্যুৎ সাশ্রয় (Save Electricity)',
+                desc: 'আজ অপ্রয়োজনীয় লাইট ও ফ্যান বন্ধ রেখেছেন? সবুজ পৃথিবী গড়তে বিদ্যুৎ সংরক্ষণ করুন।',
+                points: 10,
+                emoji: '💡'
+              },
+              {
+                id: 'eco_water',
+                title: 'পানির অপচয় রোধ (Save Water)',
+                desc: 'ব্রাশ করার সময় বা হাত ধোয়ার সময় পানির কল আলগা ছেড়ে রাখেন নি তো?',
+                points: 8,
+                emoji: '💧'
+              },
+              {
+                id: 'eco_plastic',
+                title: 'প্লাস্টিক বর্জন (No Plastic Bags)',
+                desc: 'আজ পলিথিন/প্লাস্টিকের বদলে কোনো কাপড় বা কাগজের পরিবেশ বান্ধব ব্যাগ ব্যবহার করেছেন?',
+                points: 12,
+                emoji: '🛍️'
+              },
+              {
+                id: 'eco_plant',
+                title: 'গাছের পরিচর্যা (Plant Care / Watering)',
+                desc: 'আপনার বারান্দা বা ছাদে কোনো গাছের পরিচর্যা করেছেন বা নতুন চারা রোপণ করেছেন?',
+                points: 15,
+                emoji: '🌱'
+              }
+            ].map((task) => {
+              const isCompleted = completedEcoTasks.includes(task.id);
+              return (
+                <div 
+                  key={task.id}
+                  className="bg-white/80 dark:bg-neutral-900/80 p-3.5 rounded-2xl border border-emerald-500/10 dark:border-neutral-800 flex items-start justify-between gap-3 shadow-xs hover:border-emerald-500/25 transition-all w-full"
+                >
+                  <div className="flex gap-2.5 items-start">
+                    <span className="text-2xl select-none pt-0.5" role="img" aria-label={task.title}>{task.emoji}</span>
+                    <div className="space-y-0.5 text-left">
+                      <p className="text-xs font-extrabold text-slate-800 dark:text-zinc-200">
+                        {task.title}
+                      </p>
+                      <p className="text-[10.5px] text-zinc-400 dark:text-zinc-500 font-semibold leading-relaxed">
+                        {task.desc}
+                      </p>
+                      <div className="flex items-center gap-1.5 mt-1">
+                        <span className="text-[10px] text-emerald-600 bg-emerald-50 dark:bg-emerald-950/40 font-black px-1.5 py-0.5 rounded">
+                          +{task.points} ⭐ Bonus
+                        </span>
+                      </div>
+                    </div>
+                  </div>
+
+                  <button
+                    onClick={() => handleClaimEcoTask(task.id, task.points, task.title)}
+                    disabled={isCompleted}
+                    className={`shrink-0 text-[10.5px] font-black rounded-xl px-3 py-2 transition-all cursor-pointer active:scale-95 ${
+                      isCompleted 
+                        ? 'bg-zinc-100 dark:bg-neutral-800 text-zinc-400 cursor-not-allowed font-medium' 
+                        : 'bg-emerald-500 hover:bg-emerald-600 text-white shadow-sm shadow-emerald-500/10'
+                    }`}
+                  >
+                    {isCompleted ? 'ক্লেমড ✓' : 'ক্লেম করুন'}
+                  </button>
+                </div>
+              );
+            })}
+          </div>
+        </div>
+
         {/* Dynamic Transaction history list row */}
         <div className="space-y-3 text-left">
           <h2 className="text-xs font-black text-zinc-400 uppercase tracking-widest pl-1">Transaction History</h2>
@@ -208,7 +327,7 @@ export default function WalletView({ onBack, onNavigate }: WalletViewProps) {
           ) : (
             <div className="space-y-2">
               {transactions.map((tx) => {
-                const isEarn = tx.type === 'post_earn' || tx.type === 'receive_gift' || tx.type === 'buy_stars';
+                const isEarn = tx.type === 'post_earn' || tx.type === 'receive_gift' || tx.type === 'buy_stars' || tx.type === 'eco_earn';
                 return (
                   <div
                     key={tx.id}
@@ -218,6 +337,7 @@ export default function WalletView({ onBack, onNavigate }: WalletViewProps) {
                       <div className={`p-2.5 rounded-xl ${isEarn ? 'bg-emerald-50 text-emerald-650 dark:bg-emerald-950/40 dark:text-emerald-400' : 'bg-rose-50 text-rose-600 dark:bg-rose-955/40 dark:text-rose-450'}`}>
                         {tx.type === 'buy_stars' && <Smartphone className="w-4 h-4" />}
                         {tx.type === 'post_earn' && <Lock className="w-4 h-4" />}
+                        {tx.type === 'eco_earn' && <Leaf className="w-4 h-4 text-emerald-600 dark:text-emerald-400" />}
                         {tx.type === 'unlock_post' && <Lock className="w-4 h-4" />}
                         {tx.type === 'send_gift' && <Gift className="w-4 h-4" />}
                         {tx.type === 'receive_gift' && <Gift className="w-4 h-4" />}
@@ -228,6 +348,7 @@ export default function WalletView({ onBack, onNavigate }: WalletViewProps) {
                         <span className="text-xs font-extrabold text-slate-800 dark:text-zinc-200 block">
                           {tx.type === 'buy_stars' && 'Star Recharge (bKash/Nagad)'}
                           {tx.type === 'post_earn' && `Photo Unlock Earned [${tx.referenceName}]`}
+                          {tx.type === 'eco_earn' && `${tx.referenceName || 'Eco Earning'}`}
                           {tx.type === 'unlock_post' && `Exclusive Photo Unlock`}
                           {tx.type === 'send_gift' && `Star Gift Sent [${tx.referenceName}]`}
                           {tx.type === 'receive_gift' && `Received Star Gift`}

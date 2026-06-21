@@ -317,12 +317,12 @@ export default function ChatView({ onBack, selectedUserId, onClearSelectedUser }
                         onClick={() => selectChat(chat)}
                         className="flex items-center gap-4 py-4 cursor-pointer hover:bg-neutral-50/50 dark:hover:bg-neutral-900/30 transition px-1 rounded-xl"
                       >
-                        {/* Contact avatar with active green circle indicator */}
+                        {/* Contact avatar with active offline status indicator */}
                         <div className="relative shrink-0">
                           <div className="w-12 h-12 rounded-full overflow-hidden border border-neutral-100 dark:border-neutral-800 bg-neutral-100">
                             <img src={partner.avatarUrl} alt={partner.name} className="w-full h-full object-cover" />
                           </div>
-                          <div className="absolute right-0.5 bottom-0.5 w-3.5 h-3.5 bg-emerald-500 border-2 border-white dark:border-neutral-950 rounded-full shadow"></div>
+                          <div className="absolute right-0.5 bottom-0.5 w-3.5 h-3.5 bg-zinc-300 dark:bg-zinc-700 border-2 border-white dark:border-neutral-950 rounded-full shadow" title="Offline"></div>
                         </div>
 
                         {/* Contact Info and Message teaser details snippet */}
@@ -467,7 +467,7 @@ export default function ChatView({ onBack, selectedUserId, onClearSelectedUser }
                 <div className="w-10 h-10 rounded-full overflow-hidden bg-neutral-200 border border-neutral-100 dark:border-neutral-800">
                   <img src={activePartner?.avatarUrl} alt={activePartner?.name} className="w-full h-full object-cover" />
                 </div>
-                <div className="absolute bottom-0 right-0 w-3 h-3 bg-emerald-500 border-2 border-white dark:border-neutral-950 rounded-full shadow"></div>
+                <div className="absolute bottom-0 right-0 w-3 h-3 bg-zinc-300 dark:bg-zinc-700 border-2 border-white dark:border-neutral-950 rounded-full shadow"></div>
               </div>
 
               <div>
@@ -477,7 +477,7 @@ export default function ChatView({ onBack, selectedUserId, onClearSelectedUser }
                     <VerifiedBadge className="w-3.5 h-3.5" />
                   )}
                 </span>
-                <span className="text-[10px] text-emerald-500 font-bold block mt-0.5 select-none animate-pulse">Online</span>
+                <span className="text-[10px] text-zinc-400 font-bold block mt-0.5 select-none">Offline (অফলাইন)</span>
               </div>
             </div>
 
