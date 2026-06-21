@@ -746,8 +746,15 @@ class StarConnectDatabaseService {
             this.cache.posts.push(p);
           }
         });
-        // Keep feed sorted by latest date
-        this.cache.posts.sort((a, b) => new Date(b.createdAt).getTime() - new Date(a.createdAt).getTime());
+        // Keep feed sorted by reachWeight first, and then lastActiveAt or createdAt
+        this.cache.posts.sort((a, b) => {
+          const wB = b.reachWeight || 0;
+          const wA = a.reachWeight || 0;
+          if (wB !== wA) return wB - wA;
+          const tB = new Date(b.lastActiveAt || b.createdAt).getTime();
+          const tA = new Date(a.lastActiveAt || a.createdAt).getTime();
+          return tB - tA;
+        });
         this.sync();
         window.dispatchEvent(new CustomEvent('starconnect_db_update'));
       }, (err) => {
@@ -1805,7 +1812,14 @@ class StarConnectDatabaseService {
       list = list.filter(p => p.category === category);
     }
 
-    return list.sort((a, b) => new Date(b.createdAt).getTime() - new Date(a.createdAt).getTime());
+    return list.sort((a, b) => {
+      const wB = b.reachWeight || 0;
+      const wA = a.reachWeight || 0;
+      if (wB !== wA) return wB - wA;
+      const tB = new Date(b.lastActiveAt || b.createdAt).getTime();
+      const tA = new Date(a.lastActiveAt || a.createdAt).getTime();
+      return tB - tA;
+    });
   }
 
   getReels(): Post[] {
@@ -1813,11 +1827,27 @@ class StarConnectDatabaseService {
     const blocked = me?.blockedUsers || [];
     return this.cache.posts
       .filter(p => !blocked.includes(p.authorId) && (p.isReel || p.mediaType === 'video'))
-      .sort((a, b) => new Date(b.createdAt).getTime() - new Date(a.createdAt).getTime());
+      .sort((a, b) => {
+        const wB = b.reachWeight || 0;
+        const wA = a.reachWeight || 0;
+        if (wB !== wA) return wB - wA;
+        const tB = new Date(b.lastActiveAt || b.createdAt).getTime();
+        const tA = new Date(a.lastActiveAt || a.createdAt).getTime();
+        return tB - tA;
+      });
   }
 
   getPostsByAuthor(authorId: string): Post[] {
-    return this.cache.posts.filter(p => p.authorId === authorId).sort((a, b) => new Date(b.createdAt).getTime() - new Date(a.createdAt).getTime());
+    return this.cache.posts
+      .filter(p => p.authorId === authorId)
+      .sort((a, b) => {
+        const wB = b.reachWeight || 0;
+        const wA = a.reachWeight || 0;
+        if (wB !== wA) return wB - wA;
+        const tB = new Date(b.lastActiveAt || b.createdAt).getTime();
+        const tA = new Date(a.lastActiveAt || a.createdAt).getTime();
+        return tB - tA;
+      });
   }
 
   createPost(title: string, content: string, mediaUrl: string, mediaType: 'image' | 'video' | 'none', category: string, isPremium: boolean, starPrice: number, tags: string[] = []): Post {
@@ -1855,7 +1885,9 @@ class StarConnectDatabaseService {
       createdAt: new Date().toISOString(),
       isPremiumPost: isPremium,
       starPrice: isPremium ? starPrice : 0,
-      unlockedByUserIds: []
+      unlockedByUserIds: [],
+      lastActiveAt: new Date().toISOString(),
+      reachWeight: 0
     };
 
     this.cache.posts.unshift(newPost);
@@ -1930,6 +1962,7 @@ class StarConnectDatabaseService {
     if (postIdx !== -1) {
       const post = this.cache.posts[postIdx];
       post.commentsCount++;
+      post.lastActiveAt = new Date().toISOString(); // Bumps on comment!
       updatedPost = post;
       if (post.authorId !== me.id) {
         this.addNotification(post.authorId, me.id, me.name, me.avatarUrl, 'comment', `commented on your post "${post.title || 'post'}": "${content}"`, postId);
@@ -2608,11 +2641,17 @@ class StarConnectDatabaseService {
     return null;
   }
 
-  updatePostMetrics(postId: string, likesCount: number, commentsCount: number) {
+  updatePostMetrics(postId: string, likesCount: number, commentsCount: number, reachWeight?: number, lastActiveAt?: string) {
     const post = this.cache.posts.find(p => p.id === postId);
     if (post) {
       post.likesCount = likesCount;
       post.commentsCount = commentsCount;
+      if (reachWeight !== undefined) {
+        post.reachWeight = reachWeight;
+      }
+      if (lastActiveAt !== undefined) {
+        post.lastActiveAt = lastActiveAt;
+      }
       this.sync();
       
       if (this.isFirebaseReady && this.db) {

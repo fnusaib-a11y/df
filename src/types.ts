@@ -96,6 +96,8 @@ export interface Post {
   isPremiumPost: boolean; // if true, needs unlocking
   starPrice: number; // Cost to unlock this picture
   unlockedByUserIds: string[]; // users who purchased this post
+  lastActiveAt?: string; // Facebook-like sorting: bump on comment or interaction
+  reachWeight?: number; // Admin panel control: up or down reach multiplier
 }
 
 export interface Comment {

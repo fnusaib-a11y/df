@@ -914,11 +914,11 @@ export default function AdminPanelView({ onBack }: AdminPanelViewProps) {
                   </div>
                 </div>
 
-                <div className="space-y-4 divide-y divide-neutral-100 dark:divide-neutral-850/60">
-                  {dbService.getPosts('সব').length === 0 ? (
+                <div className="space-y-4 divide-y divide-neutral-100 dark:divide-neutral-850/60 font-medium">
+                  {dbService.getPosts('All').length === 0 ? (
                     <p className="text-xs text-zinc-400 text-center py-6">কোনো পোস্ট পাওয়া যায়নি।</p>
                   ) : (
-                    dbService.getPosts('সব').map((post) => (
+                    dbService.getPosts('All').map((post) => (
                       <PostBoosterCard key={post.id} post={post} />
                     ))
                   )}
@@ -928,7 +928,6 @@ export default function AdminPanelView({ onBack }: AdminPanelViewProps) {
           )}
 
         </div>
-
       </div>
     </div>
   );
@@ -937,58 +936,120 @@ export default function AdminPanelView({ onBack }: AdminPanelViewProps) {
 function PostBoosterCard({ post }: { post: Post; key?: string }) {
   const [likes, setLikes] = React.useState(post.likesCount);
   const [comments, setComments] = React.useState(post.commentsCount);
+  const [reachWeight, setReachWeight] = React.useState(post.reachWeight || 0);
   const [isUpdating, setIsUpdating] = React.useState(false);
 
   const handleUpdate = () => {
     setIsUpdating(true);
-    dbService.updatePostMetrics(post.id, likes, comments);
+    dbService.updatePostMetrics(post.id, likes, comments, reachWeight);
     setTimeout(() => {
       setIsUpdating(false);
-      alert('সফলভাবে পোস্টের লাইক ও কমেন্ট সংখ্যা পরিবর্তন করা হয়েছে! 🚀🎯');
+      alert('সফলভাবে পোস্টের লাইক, কমেন্ট ও রিচ ওয়েট হালনাগাদ করা হয়েছে! 🚀🎯');
     }, 450);
   };
 
+  const handleBumpToTop = () => {
+    setIsUpdating(true);
+    const now = new Date().toISOString();
+    dbService.updatePostMetrics(post.id, likes, comments, reachWeight, now);
+    setTimeout(() => {
+      setIsUpdating(false);
+      alert('সফলভাবে পোস্টটি সবার উপরে Bump করা হয়েছে! 🔝🔥');
+    }, 350);
+  };
+
   return (
-    <div className="py-4 flex flex-col sm:flex-row gap-4 items-start sm:items-center justify-between">
-      <div className="flex gap-3 items-center">
-        {post.mediaUrl ? (
-          <img src={post.mediaUrl} alt="" className="w-12 h-12 object-cover rounded-xl border border-neutral-150 dark:border-neutral-800" />
-        ) : (
-          <div className="w-12 h-12 bg-indigo-50 dark:bg-indigo-950 flex items-center justify-center text-[10px] text-indigo-500 rounded-xl font-black">POST</div>
-        )}
-        <div className="min-w-0">
-          <p className="text-xs font-black text-slate-800 dark:text-neutral-200 truncate max-w-[200px]">{post.title || post.content || 'Untitled post'}</p>
-          <p className="text-[10px] text-zinc-400 mt-0.5">ক্রিয়েটর: <span className="font-bold text-amber-600">{post.authorName}</span></p>
+    <div className="py-5 flex flex-col gap-3 justify-between border-b border-neutral-100 dark:border-neutral-850/60 last:border-0 text-left">
+      <div className="flex gap-3 items-center justify-between">
+        <div className="flex gap-3 items-center">
+          {post.mediaUrl ? (
+            <img src={post.mediaUrl} alt="" className="w-12 h-12 object-cover rounded-xl border border-neutral-150 dark:border-neutral-800 shrink-0" />
+          ) : (
+            <div className="w-12 h-12 bg-indigo-50 dark:bg-indigo-950 flex items-center justify-center text-[10px] text-indigo-500 rounded-xl font-black shrink-0">POST</div>
+          )}
+          <div className="min-w-0">
+            <p className="text-xs font-black text-slate-800 dark:text-neutral-200 truncate max-w-[250px]">{post.title || post.content || 'Untitled post'}</p>
+            <p className="text-[10px] text-zinc-400 mt-0.5">ক্রিয়েটর: <span className="font-bold text-amber-600">{post.authorName}</span></p>
+          </div>
         </div>
+
+        <button
+          onClick={handleBumpToTop}
+          className="text-[9px] font-black px-2.5 py-1.5 bg-amber-500 hover:bg-amber-600 text-white rounded-lg transition active:scale-95 duration-100 flex items-center gap-1 cursor-pointer"
+          title="পোস্টটি সবার উপরে নিয়ে আসুন"
+        >
+          <span>🔝</span> সবার উপরে তুলুন (Bump)
+        </button>
       </div>
 
-      <div className="flex flex-wrap items-center gap-2.5">
-        <div className="flex items-center gap-1 bg-neutral-50 dark:bg-zinc-950 border border-neutral-150 dark:border-neutral-800 rounded-lg px-2 py-1">
-          <Heart className="w-3.5 h-3.5 text-rose-500 fill-rose-500 shrink-0" />
-          <input
-            type="number"
-            value={likes}
-            onChange={(e) => setLikes(Math.max(0, parseInt(e.target.value) || 0))}
-            className="w-12 text-center text-xs font-black bg-transparent border-none focus:outline-none text-slate-800 dark:text-neutral-100"
-            title="লাইক সংখ্যা"
-          />
+      <div className="flex flex-wrap items-center justify-between gap-3 pt-1">
+        {/* Metric inputs (Likes, Comments) */}
+        <div className="flex items-center gap-2">
+          {/* Likes field */}
+          <div className="flex items-center gap-1 bg-neutral-50 dark:bg-zinc-950 border border-neutral-150 dark:border-neutral-800 rounded-lg px-2.5 py-1">
+            <Heart className="w-3.5 h-3.5 text-rose-500 fill-rose-500 shrink-0" />
+            <input
+              type="number"
+              value={likes}
+              onChange={(e) => setLikes(Math.max(0, parseInt(e.target.value) || 0))}
+              className="w-12 text-center text-xs font-black bg-transparent border-none focus:outline-none text-slate-800 dark:text-neutral-100"
+              title="লাইক সংখ্যা"
+            />
+          </div>
+
+          {/* Comments field */}
+          <div className="flex items-center gap-1 bg-neutral-50 dark:bg-zinc-950 border border-neutral-150 dark:border-neutral-800 rounded-lg px-2.5 py-1">
+            <span className="text-xs shrink-0">💬</span>
+            <input
+              type="number"
+              value={comments}
+              onChange={(e) => setComments(Math.max(0, parseInt(e.target.value) || 0))}
+              className="w-12 text-center text-xs font-black bg-transparent border-none focus:outline-none text-slate-800 dark:text-neutral-100"
+              title="কমেন্ট সংখ্যা"
+            />
+          </div>
         </div>
 
-        <div className="flex items-center gap-1 bg-neutral-50 dark:bg-zinc-950 border border-neutral-150 dark:border-neutral-800 rounded-lg px-2 py-1">
-          <span className="text-xs shrink-0">💬</span>
-          <input
-            type="number"
-            value={comments}
-            onChange={(e) => setComments(Math.max(0, parseInt(e.target.value) || 0))}
-            className="w-12 text-center text-xs font-black bg-transparent border-none focus:outline-none text-slate-800 dark:text-neutral-100"
-            title="কমেন্ট সংখ্যা"
-          />
+        {/* Reach Controls (Up / Down) */}
+        <div className="flex items-center gap-1 bg-neutral-50 dark:bg-zinc-950 p-1 rounded-xl border border-neutral-150 dark:border-neutral-800">
+          <button
+            onClick={() => setReachWeight(-500)}
+            className={`px-2.5 py-1 text-[9px] font-black rounded-lg transition-all cursor-pointer ${
+              reachWeight < 0 
+                ? 'bg-rose-500 text-white shadow-xs' 
+                : 'text-zinc-500 hover:bg-neutral-150 dark:hover:bg-neutral-800'
+            }`}
+          >
+            🛑 রিচ ডাউন
+          </button>
+          
+          <button
+            onClick={() => setReachWeight(0)}
+            className={`px-2.5 py-1 text-[9px] font-black rounded-lg transition-all cursor-pointer ${
+              reachWeight === 0 
+                ? 'bg-zinc-300 dark:bg-zinc-700 text-slate-800 dark:text-zinc-100 shadow-xs' 
+                : 'text-zinc-500 hover:bg-neutral-150 dark:hover:bg-neutral-800'
+            }`}
+          >
+            স্বাভাবিক
+          </button>
+
+          <button
+            onClick={() => setReachWeight(500)}
+            className={`px-2.5 py-1 text-[9px] font-black rounded-lg transition-all cursor-pointer ${
+              reachWeight > 0 
+                ? 'bg-[#11af5f] text-white shadow-xs animate-pulse' 
+                : 'text-zinc-500 hover:bg-neutral-150 dark:hover:bg-neutral-800'
+            }`}
+          >
+            🚀 রিচ আপ
+          </button>
         </div>
 
         <button
           onClick={handleUpdate}
           disabled={isUpdating}
-          className="text-[11px] font-black px-3 py-1.5 bg-indigo-650 hover:bg-indigo-700 text-white rounded-lg transition active:scale-95 duration-100 cursor-pointer disabled:opacity-50"
+          className="text-[11px] font-black px-4 py-1.5 bg-indigo-650 hover:bg-indigo-700 text-white rounded-lg transition active:scale-95 duration-100 cursor-pointer disabled:opacity-50"
         >
           {isUpdating ? 'আপডেট...' : 'হালনাগাদ'}
         </button>
