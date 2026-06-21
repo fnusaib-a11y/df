@@ -23,6 +23,7 @@ export default function ChatView({ onBack, selectedUserId, onClearSelectedUser }
   const [messages, setMessages] = React.useState<Message[]>([]);
   const [newMessageText, setNewMessageText] = React.useState('');
   const [searchQuery, setSearchQuery] = React.useState('');
+  const [activeMessengerTab, setActiveMessengerTab] = React.useState<'chats' | 'group'>('chats');
 
   // Pull-to-refresh states
   const [isRefreshing, setIsRefreshing] = React.useState(false);
@@ -196,131 +197,250 @@ export default function ChatView({ onBack, selectedUserId, onClearSelectedUser }
             </button>
           </div>
 
-          {/* Search Contacts Bar */}
-          <div className="px-4 py-3">
-            <div className="relative flex items-center bg-neutral-100 dark:bg-neutral-900 rounded-xl px-3.5 py-2.5">
-              <Search className="w-5 h-5 text-neutral-400 mr-2" />
-              <input
-                type="text"
-                placeholder="Search creators and friends to chat..."
-                value={searchQuery}
-                onChange={(e) => setSearchQuery(e.target.value)}
-                className="w-full bg-transparent text-xs text-neutral-800 dark:text-neutral-100 placeholder-neutral-400 dark:placeholder-neutral-500 focus:outline-none"
-              />
-            </div>
+          {/* Tabs for Inbox vs Group */}
+          <div className="flex border-b border-neutral-100 dark:border-neutral-900 mx-4 mt-2 mb-2 shrink-0">
+            <button
+              onClick={() => setActiveMessengerTab('chats')}
+              className={`flex-1 pb-3 text-xs font-black tracking-wider uppercase transition border-b-2 text-center cursor-pointer ${
+                activeMessengerTab === 'chats' 
+                  ? 'border-[#11af5f] text-[#11af5f]' 
+                  : 'border-transparent text-zinc-400 hover:text-slate-600 dark:hover:text-neutral-300'
+              }`}
+            >
+              মেসেজসমূহ (Inbox)
+            </button>
+            <button
+              onClick={() => setActiveMessengerTab('group')}
+              className={`flex-1 pb-3 text-xs font-black tracking-wider uppercase transition border-b-2 text-center cursor-pointer ${
+                activeMessengerTab === 'group' 
+                  ? 'border-[#11af5f] text-[#11af5f]' 
+                  : 'border-transparent text-zinc-400 hover:text-slate-600 dark:hover:text-neutral-300'
+              }`}
+            >
+              আমার গ্রুপ ও লিডার
+            </button>
           </div>
 
-          {/* Search Result Overlay Dropdown */}
-          {searchQuery && (
-            <div className="px-4 py-2 border-b border-neutral-100 dark:border-neutral-900 bg-amber-500/5 dark:bg-amber-950/10 space-y-1">
-              <span className="text-[10px] font-bold text-amber-600 tracking-wide uppercase">Search Results ({filteredUsers.length})</span>
-              <div className="space-y-2 mt-2">
-                {filteredUsers.map(user => (
-                  <button
-                    key={user.id}
-                    onClick={() => startNewChatWithUser(user)}
-                    className="w-full flex items-center gap-3 p-2 rounded-xl bg-white dark:bg-neutral-900 border border-neutral-100 dark:border-neutral-800 text-left hover:scale-[1.01] transition"
-                  >
-                    <div className="w-9 h-9 rounded-full overflow-hidden bg-neutral-200">
-                      <img src={user.avatarUrl} alt={user.name} className="w-full h-full object-cover" />
-                    </div>
-                    <span className="text-xs font-bold text-neutral-800 dark:text-neutral-200 flex items-center gap-1">
-                      {user.name}
-                      {user.isVerified && <VerifiedBadge className="w-3.5 h-3.5" />}
-                    </span>
-                  </button>
-                ))}
+          {activeMessengerTab === 'chats' ? (
+            <>
+              {/* Search Contacts Bar */}
+              <div className="px-4 py-3">
+                <div className="relative flex items-center bg-neutral-100 dark:bg-neutral-900 rounded-xl px-3.5 py-2.5">
+                  <Search className="w-5 h-5 text-neutral-400 mr-2" />
+                  <input
+                    type="text"
+                    placeholder="Search creators and friends to chat..."
+                    value={searchQuery}
+                    onChange={(e) => setSearchQuery(e.target.value)}
+                    className="w-full bg-transparent text-xs text-neutral-800 dark:text-neutral-100 placeholder-neutral-400 dark:placeholder-neutral-500 focus:outline-none"
+                  />
+                </div>
+              </div>
+
+              {/* Search Result Overlay Dropdown */}
+              {searchQuery && (
+                <div className="px-4 py-2 border-b border-neutral-100 dark:border-neutral-900 bg-amber-500/5 dark:bg-amber-950/10 space-y-1">
+                  <span className="text-[10px] font-bold text-amber-600 tracking-wide uppercase">Search Results ({filteredUsers.length})</span>
+                  <div className="space-y-2 mt-2">
+                    {filteredUsers.map(user => (
+                      <button
+                        key={user.id}
+                        onClick={() => startNewChatWithUser(user)}
+                        className="w-full flex items-center gap-3 p-2 rounded-xl bg-white dark:bg-neutral-900 border border-neutral-100 dark:border-neutral-800 text-left hover:scale-[1.01] transition"
+                      >
+                        <div className="w-9 h-9 rounded-full overflow-hidden bg-neutral-200">
+                          <img src={user.avatarUrl} alt={user.name} className="w-full h-full object-cover" />
+                        </div>
+                        <span className="text-xs font-bold text-neutral-800 dark:text-neutral-200 flex items-center gap-1">
+                          {user.name}
+                          {user.isVerified && <VerifiedBadge className="w-3.5 h-3.5" />}
+                        </span>
+                      </button>
+                    ))}
+                  </div>
+                </div>
+              )}
+
+              {/* Threads List */}
+              <div 
+                onTouchStart={handleTouchStart}
+                onTouchMove={handleTouchMove}
+                onTouchEnd={handleTouchEnd}
+                className="flex-1 overflow-y-auto px-4 divide-y divide-neutral-50 dark:divide-neutral-900 scrollbar-none"
+              >
+                {/* Dynamic pull-to-refresh indicator */}
+                <div 
+                  className="w-full flex items-center justify-center overflow-hidden transition-all duration-150 relative border-b border-amber-500/5 dark:border-neutral-900/10 mb-2"
+                  style={{ 
+                    height: pullDistance > 0 ? `${pullDistance}px` : '0px',
+                    opacity: pullDistance > 0 ? Math.min(pullDistance / 35, 1) : 0 
+                  }}
+                >
+                  <div className="flex items-center gap-2 py-1">
+                    {isRefreshing ? (
+                      <div className="flex items-center gap-1.5 bg-amber-50 dark:bg-[#111] border border-amber-100 dark:border-neutral-800 px-3 py-1.5 rounded-full shadow-sm text-amber-700 dark:text-amber-400 font-bold text-xs select-none">
+                        <Sparkles className="w-4 h-4 animate-spin text-amber-500" />
+                        <span className="animate-pulse">Loading messages...</span>
+                      </div>
+                    ) : (
+                      <div className="flex items-center gap-1.5 bg-neutral-50 dark:bg-neutral-900 border border-neutral-100 dark:border-neutral-800 px-3 py-1.5 rounded-full shadow-sm text-neutral-500 font-bold text-xs select-none">
+                        <span className="font-mono text-amber-600 dark:text-amber-400 tracking-wider text-[9px] uppercase font-black animate-pulse">
+                          {pullDistance > 45 ? "Release to refresh" : "Pull to refresh"}
+                        </span>
+                      </div>
+                    )}
+                  </div>
+                </div>
+
+                {chats.length === 0 ? (
+                  <div className="py-24 text-center text-neutral-500 dark:text-neutral-400 space-y-2">
+                    <p className="text-sm">No chat threads found.</p>
+                    <p className="text-xs">Start a conversation by searching creators at the top search bar!</p>
+                  </div>
+                ) : (
+                  chats.map((chat) => {
+                    const partnerId = chat.participants.find(id => id !== me.id) || '';
+                    const partner = users.find(u => u.id === partnerId);
+                    const unread = chat.unreadCount ? chat.unreadCount[me.id] || 0 : 0;
+
+                    if (!partner) return null;
+
+                    return (
+                      <div
+                        key={chat.id}
+                        onClick={() => selectChat(chat)}
+                        className="flex items-center gap-4 py-4 cursor-pointer hover:bg-neutral-50/50 dark:hover:bg-neutral-900/30 transition px-1 rounded-xl"
+                      >
+                        {/* Contact avatar with active green circle indicator */}
+                        <div className="relative shrink-0">
+                          <div className="w-12 h-12 rounded-full overflow-hidden border border-neutral-100 dark:border-neutral-800 bg-neutral-100">
+                            <img src={partner.avatarUrl} alt={partner.name} className="w-full h-full object-cover" />
+                          </div>
+                          <div className="absolute right-0.5 bottom-0.5 w-3.5 h-3.5 bg-emerald-500 border-2 border-white dark:border-neutral-950 rounded-full shadow"></div>
+                        </div>
+
+                        {/* Contact Info and Message teaser details snippet */}
+                        <div className="flex-1 min-w-0">
+                          <div className="flex justify-between items-baseline mb-1">
+                            <span className="text-sm font-bold text-neutral-800 dark:text-neutral-200 flex items-center gap-1 leading-sharp">
+                              {partner.name}
+                              {partner.isVerified && (
+                                <VerifiedBadge className="w-4 h-4" />
+                              )}
+                            </span>
+                            <span className="text-[10px] text-neutral-400 dark:text-neutral-500 font-mono">
+                              {new Date(chat.lastMessageAt).toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' })}
+                            </span>
+                          </div>
+                          <div className="flex justify-between items-center">
+                            <p className={`text-xs truncate ${unread > 0 ? 'font-extrabold text-amber-600 dark:text-amber-400' : 'text-neutral-500'}`}>
+                              {chat.lastMessage}
+                            </p>
+                            {unread > 0 && (
+                              <div className="bg-amber-500 text-white text-[9px] font-extrabold w-5 h-5 rounded-full flex items-center justify-center scale-95">
+                                {unread}
+                              </div>
+                            )}
+                          </div>
+                        </div>
+                      </div>
+                    );
+                  })
+                )}
+              </div>
+            </>
+          ) : (
+            /* Custom Referral Group details displayed inside messenger list */
+            <div className="flex-1 overflow-y-auto px-4 py-4 space-y-5 text-left animate-fadeIn">
+              {/* Leader Section */}
+              <div className="bg-amber-500/5 dark:bg-amber-955/20 border border-amber-500/15 rounded-2xl p-4 space-y-3">
+                <h4 className="text-[10px] font-black uppercase tracking-wider text-amber-600 flex items-center gap-1">
+                  <span>👤</span> আমার দলনেতা (My Leader)
+                </h4>
+                {(() => {
+                  const leaderId = me.referredBy;
+                  const leader = leaderId ? dbService.getUserById(leaderId) : null;
+                  if (leader) {
+                    return (
+                      <div className="flex items-center justify-between bg-white dark:bg-zinc-900 border border-neutral-100 dark:border-neutral-800 p-3 rounded-xl shadow-xs">
+                        <div className="flex items-center gap-3">
+                          <img src={leader.avatarUrl} alt="" className="w-9 h-9 rounded-full object-cover border border-amber-100" />
+                          <div>
+                            <p className="text-xs font-extrabold text-slate-800 dark:text-zinc-200 flex items-center gap-1">
+                              {leader.name}
+                              {leader.isVerified && <VerifiedBadge className="w-3.5 h-3.5" />}
+                            </p>
+                            <p className="text-[9.5px] text-zinc-400 font-mono">@{leader.username}</p>
+                          </div>
+                        </div>
+                        <button
+                          onClick={() => startNewChatWithUser(leader)}
+                          className="px-3 py-1.5 bg-[#11af5f] hover:bg-[#0fa056] text-white text-[10px] font-black rounded-lg transition active:scale-95 cursor-pointer"
+                        >
+                          মেসেজ করুন
+                        </button>
+                      </div>
+                    );
+                  } else {
+                    return (
+                      <p className="text-[11px] text-zinc-400 leading-relaxed pl-1">
+                        আপনি সরাসরি অ্যাপ এ জয়েন করেছেন, তাই আপনার কোনো নির্দিষ্ট দলনেতা (Leader) নেই।
+                      </p>
+                    );
+                  }
+                })()}
+              </div>
+
+              {/* Group Members Section */}
+              <div className="bg-neutral-50 dark:bg-neutral-900 border border-neutral-200 dark:border-neutral-800 rounded-2xl p-4 space-y-3">
+                <div className="flex justify-between items-center pb-1 border-b border-neutral-100 dark:border-neutral-800">
+                  <h4 className="text-[10px] font-black uppercase tracking-wider text-slate-700 dark:text-zinc-300">
+                    👥 আমার দল সদস্য (My Group Members)
+                  </h4>
+                  <span className="text-[9.5px] bg-[#11af5f]/10 text-[#11af5f] font-black px-2 py-0.5 rounded-md">
+                    মোট: {dbService.getUsers().filter(u => u.referredBy === me.id).length} জন
+                  </span>
+                </div>
+
+                {(() => {
+                  const members = dbService.getUsers().filter(u => u.referredBy === me.id);
+                  if (members.length === 0) {
+                    return (
+                      <div className="py-6 text-center">
+                        <p className="text-[11px] text-zinc-400">আপনার রেফারেল কোড ব্যবহার করে এখনো কেউ সাইনআপ করেনি।</p>
+                        <p className="text-[10px] text-[#11af5f] font-bold mt-1">
+                          কোড শেয়ার করুন: <span className="font-black bg-emerald-50 dark:bg-emerald-950/40 px-1.5 py-0.5 rounded border border-emerald-250">{me.referralCode}</span>
+                        </p>
+                      </div>
+                    );
+                  } else {
+                    return (
+                      <div className="space-y-2 max-h-[420px] overflow-y-auto pr-1">
+                        {members.map((u) => (
+                          <div key={u.id} className="flex items-center justify-between bg-white dark:bg-zinc-950 border border-neutral-100 dark:border-neutral-850 p-2.5 rounded-xl">
+                            <div className="flex items-center gap-2.5">
+                              <img src={u.avatarUrl} alt="" className="w-8 h-8 rounded-full object-cover" />
+                              <div>
+                                <p className="text-[11px] font-bold text-slate-800 dark:text-neutral-200 leading-none">{u.name}</p>
+                                <p className="text-[9px] text-zinc-400 font-mono mt-1">@{u.username} • ব্যালেন্স: ⭐{u.starBalance || 0}</p>
+                              </div>
+                            </div>
+
+                            <button
+                              onClick={() => startNewChatWithUser(u)}
+                              className="bg-[#11af5f] hover:bg-[#0fa056] text-white text-[10px] font-black px-3 py-1.5 rounded-lg active:scale-95 transition cursor-pointer"
+                            >
+                              চ্যাট
+                            </button>
+                          </div>
+                        ))}
+                      </div>
+                    );
+                  }
+                })()}
               </div>
             </div>
           )}
-
-          {/* Threads List */}
-          <div 
-            onTouchStart={handleTouchStart}
-            onTouchMove={handleTouchMove}
-            onTouchEnd={handleTouchEnd}
-            className="flex-1 overflow-y-auto px-4 divide-y divide-neutral-50 dark:divide-neutral-900 scrollbar-none"
-          >
-            {/* Dynamic pull-to-refresh indicator */}
-            <div 
-              className="w-full flex items-center justify-center overflow-hidden transition-all duration-150 relative border-b border-amber-500/5 dark:border-neutral-900/10 mb-2"
-              style={{ 
-                height: pullDistance > 0 ? `${pullDistance}px` : '0px',
-                opacity: pullDistance > 0 ? Math.min(pullDistance / 35, 1) : 0 
-              }}
-            >
-              <div className="flex items-center gap-2 py-1">
-                {isRefreshing ? (
-                  <div className="flex items-center gap-1.5 bg-amber-50 dark:bg-[#111] border border-amber-100 dark:border-neutral-800 px-3 py-1.5 rounded-full shadow-sm text-amber-700 dark:text-amber-400 font-bold text-xs select-none">
-                    <Sparkles className="w-4 h-4 animate-spin text-amber-500" />
-                    <span className="animate-pulse">Loading messages...</span>
-                  </div>
-                ) : (
-                  <div className="flex items-center gap-1.5 bg-neutral-50 dark:bg-neutral-900 border border-neutral-100 dark:border-neutral-800 px-3 py-1.5 rounded-full shadow-sm text-neutral-500 font-bold text-xs select-none">
-                    <span className="font-mono text-amber-600 dark:text-amber-400 tracking-wider text-[9px] uppercase font-black animate-pulse">
-                      {pullDistance > 45 ? "Release to refresh" : "Pull to refresh"}
-                    </span>
-                  </div>
-                )}
-              </div>
-            </div>
-
-            {chats.length === 0 ? (
-              <div className="py-24 text-center text-neutral-500 dark:text-neutral-400 space-y-2">
-                <p className="text-sm">No chat threads found.</p>
-                <p className="text-xs">Start a conversation by searching creators at the top search bar!</p>
-              </div>
-            ) : (
-              chats.map((chat) => {
-                const partnerId = chat.participants.find(id => id !== me.id) || '';
-                const partner = users.find(u => u.id === partnerId);
-                const unread = chat.unreadCount ? chat.unreadCount[me.id] || 0 : 0;
-
-                if (!partner) return null;
-
-                return (
-                  <div
-                    key={chat.id}
-                    onClick={() => selectChat(chat)}
-                    className="flex items-center gap-4 py-4 cursor-pointer hover:bg-neutral-50/50 dark:hover:bg-neutral-900/30 transition px-1 rounded-xl"
-                  >
-                    {/* Contact avatar with active green circle indicator */}
-                    <div className="relative shrink-0">
-                      <div className="w-12 h-12 rounded-full overflow-hidden border border-neutral-100 dark:border-neutral-800 bg-neutral-100">
-                        <img src={partner.avatarUrl} alt={partner.name} className="w-full h-full object-cover" />
-                      </div>
-                      <div className="absolute right-0.5 bottom-0.5 w-3.5 h-3.5 bg-emerald-500 border-2 border-white dark:border-neutral-950 rounded-full shadow"></div>
-                    </div>
-
-                    {/* Contact Info and Message teaser details snippet */}
-                    <div className="flex-1 min-w-0">
-                      <div className="flex justify-between items-baseline mb-1">
-                        <span className="text-sm font-bold text-neutral-800 dark:text-neutral-200 flex items-center gap-1 leading-sharp">
-                          {partner.name}
-                          {partner.isVerified && (
-                            <VerifiedBadge className="w-4 h-4" />
-                          )}
-                        </span>
-                        <span className="text-[10px] text-neutral-400 dark:text-neutral-500 font-mono">
-                          {new Date(chat.lastMessageAt).toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' })}
-                        </span>
-                      </div>
-                      <div className="flex justify-between items-center">
-                        <p className={`text-xs truncate ${unread > 0 ? 'font-extrabold text-amber-600 dark:text-amber-400' : 'text-neutral-500'}`}>
-                          {chat.lastMessage}
-                        </p>
-                        {unread > 0 && (
-                          <div className="bg-amber-500 text-white text-[9px] font-extrabold w-5 h-5 rounded-full flex items-center justify-center scale-95">
-                            {unread}
-                          </div>
-                        )}
-                      </div>
-                    </div>
-                  </div>
-                );
-              })
-            )}
-          </div>
         </div>
       ) : (
         /* ---------------------------- */

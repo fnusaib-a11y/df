@@ -36,7 +36,6 @@ const PRESET_COVERS = [
 export default function ProfileView({ onNavigate, onEditProfile, editProfileOpen, onEditProfileClose, onPostSelect, onChatWithUser }: ProfileViewProps) {
   const [currentUser, setCurrentUser] = React.useState<UserProfile>(dbService.getCurrentUser());
   const [myPosts, setMyPosts] = React.useState<Post[]>([]);
-  const [activeProfileTab, setActiveProfileTab] = React.useState<'posts' | 'group'>('posts');
   
   // Profile edit form fields state
   const [isEditing, setIsEditing] = React.useState(false);
@@ -287,170 +286,58 @@ export default function ProfileView({ onNavigate, onEditProfile, editProfileOpen
         </button>
       </div>
 
-      {/* Sub Header Tab bar selection */}
-      <div className="flex border-b border-neutral-100 dark:border-neutral-900 mt-6 mx-4">
-        <button
-          onClick={() => setActiveProfileTab('posts')}
-          className={`flex-1 pb-3 text-xs font-black tracking-wider uppercase transition border-b-2 text-center cursor-pointer ${
-            activeProfileTab === 'posts' 
-              ? 'border-amber-500 text-amber-500' 
-              : 'border-transparent text-zinc-400 hover:text-slate-600'
-          }`}
-        >
+      {/* Posts list grid */}
+      <div className="px-4 mt-6 text-left">
+        <h3 className="text-xs font-black uppercase tracking-widest text-[#11af5f] border-b border-neutral-100 dark:border-neutral-900 pb-2 mb-4">
           Your Posts ({myPosts.length})
-        </button>
-        <button
-          onClick={() => setActiveProfileTab('group')}
-          className={`flex-1 pb-3 text-xs font-black tracking-wider uppercase transition border-b-2 text-center cursor-pointer ${
-            activeProfileTab === 'group' 
-              ? 'border-amber-500 text-amber-500' 
-              : 'border-transparent text-zinc-400 hover:text-slate-600'
-          }`}
-        >
-          আমার গ্রুপ ও লিডার (GROUP & LEADER)
-        </button>
-      </div>
+        </h3>
+        {myPosts.length === 0 ? (
+          <div className="py-12 text-center text-neutral-500 dark:text-neutral-400">
+            <p className="text-xs">No posts uploaded yet.</p>
+          </div>
+        ) : (
+          <div className="grid grid-cols-2 gap-2">
+            {myPosts.map((post) => (
+              <div
+                key={post.id}
+                onClick={() => onPostSelect && onPostSelect(post)}
+                className="aspect-square bg-neutral-100 dark:bg-neutral-900 rounded-xl overflow-hidden cursor-pointer group relative shadow-sm hover:opacity-95 animate-fadeIn"
+              >
+                {post.mediaType === 'image' && post.mediaUrl && (
+                  <img
+                    src={post.mediaUrl}
+                    alt="Post media"
+                    className="w-full h-full object-cover group-hover:scale-105 transition duration-300"
+                    onError={(e) => {
+                      (e.target as HTMLImageElement).src = 'https://images.unsplash.com/photo-1510557880182-3d4d3cba35a5?auto=format&fit=crop&w=400&q=80';
+                    }}
+                  />
+                )}
 
-      {activeProfileTab === 'posts' ? (
-        /* Posts list grid */
-        <div className="px-4 mt-4 text-left">
-          {myPosts.length === 0 ? (
-            <div className="py-12 text-center text-neutral-500 dark:text-neutral-400">
-              <p className="text-xs">No posts uploaded yet.</p>
-            </div>
-          ) : (
-            <div className="grid grid-cols-2 gap-2">
-              {myPosts.map((post) => (
-                <div
-                  key={post.id}
-                  onClick={() => onPostSelect && onPostSelect(post)}
-                  className="aspect-square bg-neutral-100 dark:bg-neutral-900 rounded-xl overflow-hidden cursor-pointer group relative shadow-sm hover:opacity-95 animate-fadeIn"
-                >
-                  {post.mediaType === 'image' && post.mediaUrl && (
-                    <img
+                {post.mediaType === 'video' && post.mediaUrl && (
+                  <div className="w-full h-full relative bg-neutral-950 flex items-center justify-center">
+                    <video
                       src={post.mediaUrl}
-                      alt="Post media"
+                      muted
+                      playsInline
                       className="w-full h-full object-cover group-hover:scale-105 transition duration-300"
-                      onError={(e) => {
-                        (e.target as HTMLImageElement).src = 'https://images.unsplash.com/photo-1510557880182-3d4d3cba35a5?auto=format&fit=crop&w=400&q=80';
-                      }}
                     />
-                  )}
-
-                  {post.mediaType === 'video' && post.mediaUrl && (
-                    <div className="w-full h-full relative bg-neutral-950 flex items-center justify-center">
-                      <video
-                        src={post.mediaUrl}
-                        muted
-                        playsInline
-                        className="w-full h-full object-cover group-hover:scale-105 transition duration-300"
-                      />
-                      <div className="absolute top-2 right-2 bg-neutral-950/70 text-white text-[10px] font-semibold px-1.5 py-0.5 rounded">
-                        Reels
-                      </div>
+                    <div className="absolute top-2 right-2 bg-neutral-950/70 text-white text-[10px] font-semibold px-1.5 py-0.5 rounded">
+                      Reels
                     </div>
-                  )}
-
-                  {!post.mediaUrl && (
-                    <div className="w-full h-full p-3 bg-gradient-to-tr from-amber-500 to-amber-600 text-white flex items-center justify-center text-center text-xs font-medium">
-                      <p className="line-clamp-4">{post.content}</p>
-                    </div>
-                  )}
-                </div>
-              ))}
-            </div>
-          )}
-        </div>
-      ) : (
-        /* Leader & Custom referral group members panel */
-        <div className="px-4 mt-5 text-left space-y-5 animate-fadeIn">
-          {/* Leader Section */}
-          <div className="bg-amber-500/5 dark:bg-amber-950/10 border border-amber-500/15 rounded-2xl p-4 space-y-3">
-            <h4 className="text-[10px] font-black uppercase tracking-wider text-amber-600">👤 আমার দলনেতা (My Leader)</h4>
-            {(() => {
-              const leaderId = currentUser.referredBy;
-              const leader = leaderId ? dbService.getUserById(leaderId) : null;
-              if (leader) {
-                return (
-                  <div className="flex items-center justify-between bg-white dark:bg-zinc-900 border border-neutral-100 dark:border-neutral-800 p-3 rounded-xl shadow-xs">
-                    <div className="flex items-center gap-3">
-                      <img src={leader.avatarUrl} alt="" className="w-9 h-9 rounded-full object-cover border border-amber-100" />
-                      <div>
-                        <p className="text-xs font-extrabold text-slate-800 dark:text-zinc-200 flex items-center gap-1">
-                          {leader.name}
-                          {leader.isVerified && <VerifiedBadge className="w-3.5 h-3.5" />}
-                        </p>
-                        <p className="text-[9.5px] text-zinc-400 font-mono">@{leader.username}</p>
-                      </div>
-                    </div>
-                    {onChatWithUser && (
-                      <button
-                        onClick={() => onChatWithUser(leader.id)}
-                        className="px-3 py-1.5 bg-amber-500 hover:bg-amber-600 text-white text-[10px] font-black rounded-lg transition active:scale-95 cursor-pointer"
-                      >
-                        মেসেজ করুন
-                      </button>
-                    )}
                   </div>
-                );
-              } else {
-                return (
-                  <p className="text-[11px] text-zinc-400 leading-relaxed pl-1">
-                    আপনি সরাসরি অ্যাপ এ জয়েন করেছেন, তাই আপনার কোনো নির্দিষ্ট দলনেতা (Leader) নেই।
-                  </p>
-                );
-              }
-            })()}
+                )}
+
+                {!post.mediaUrl && (
+                  <div className="w-full h-full p-3 bg-gradient-to-tr from-amber-500 to-amber-600 text-white flex items-center justify-center text-center text-xs font-medium">
+                    <p className="line-clamp-4">{post.content}</p>
+                  </div>
+                )}
+              </div>
+            ))}
           </div>
-
-          {/* Group Members Section */}
-          <div className="bg-neutral-50 dark:bg-zinc-900 border border-neutral-200 dark:border-neutral-800 rounded-2xl p-4 space-y-3">
-            <div className="flex justify-between items-center pb-1 border-b border-neutral-100 dark:border-neutral-800">
-              <h4 className="text-[10px] font-black uppercase tracking-wider text-slate-700 dark:text-zinc-300">👥 আমার দল সদস্য (My Group Members)</h4>
-              <span className="text-[9.5px] bg-slate-100 dark:bg-zinc-950 text-slate-600 dark:text-zinc-300 font-black px-2 py-0.5 rounded-md">
-                মোট: {dbService.getUsers().filter(u => u.referredBy === currentUser.id).length} জন
-              </span>
-            </div>
-
-            {(() => {
-              const members = dbService.getUsers().filter(u => u.referredBy === currentUser.id);
-              if (members.length === 0) {
-                return (
-                  <div className="py-6 text-center">
-                    <p className="text-[11px] text-zinc-400">আপনার রেফারেল কোড ব্যবহার করে এখনো কেউ সাইনআপ করেনি।</p>
-                    <p className="text-[10px] text-amber-600 font-bold mt-1">কোড শেয়ার করুন: <span className="font-black bg-amber-50 dark:bg-amber-950/40 px-1.5 py-0.5 rounded border border-amber-200">{currentUser.referralCode}</span></p>
-                  </div>
-                );
-              } else {
-                return (
-                  <div className="space-y-2 max-h-56 overflow-y-auto pr-1">
-                    {members.map((u) => (
-                      <div key={u.id} className="flex items-center justify-between bg-white dark:bg-zinc-950 border border-neutral-100 dark:border-neutral-850 p-2.5 rounded-xl">
-                        <div className="flex items-center gap-2.5">
-                          <img src={u.avatarUrl} alt="" className="w-8 h-8 rounded-full object-cover" />
-                          <div>
-                            <p className="text-[11px] font-bold text-slate-800 dark:text-neutral-200 leading-none">{u.name}</p>
-                            <p className="text-[9px] text-zinc-400 font-mono mt-1">@{u.username} • ব্যালেন্স: ⭐{u.starBalance || 0}</p>
-                          </div>
-                        </div>
-
-                        {onChatWithUser && (
-                          <button
-                            onClick={() => onChatWithUser(u.id)}
-                            className="bg-neutral-150 hover:bg-neutral-200 dark:bg-neutral-800 dark:hover:bg-neutral-750 text-slate-700 dark:text-neutral-200 text-[9px] font-black px-2.5 py-1.5 rounded-lg active:scale-95 transition cursor-pointer"
-                          >
-                            চ্যাট
-                          </button>
-                        )}
-                      </div>
-                    ))}
-                  </div>
-                );
-              }
-            })()}
-          </div>
-        </div>
-      )}
+        )}
+      </div>
 
       {/* Admin Panel Link for Admins */}
       {currentUser.role === 'admin' && (
