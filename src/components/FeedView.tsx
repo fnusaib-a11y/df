@@ -4,7 +4,7 @@
  */
 
 import React from 'react';
-import { Search, Bell, Heart, MessageCircle, Share2, MoreHorizontal, CheckCircle2, ShieldAlert, Sparkles, Send, Lock, Gift, Coins, AlertCircle, X } from 'lucide-react';
+import { Search, Bell, Heart, MessageCircle, Share2, MoreHorizontal, CheckCircle2, ShieldAlert, Sparkles, Send, Lock, Gift, Coins, AlertCircle, X, Camera } from 'lucide-react';
 import { Post, Comment, Story, UserProfile, NotificationItem } from '../types';
 import { dbService } from '../services/db';
 import { VerifiedBadge } from './VerifiedBadge';
@@ -472,7 +472,7 @@ export default function FeedView({ onNavigate, onUserSelect, onMessageUser }: Fe
       return;
     }
 
-    const res = dbService.sendDirectStars(giftingPost.authorId, giftAmount);
+    const res = dbService.giftStarsToPost(giftingPost.id, giftAmount);
     if (res.success) {
       setGiftingSuccess(true);
       setTimeout(() => {
@@ -995,6 +995,25 @@ export default function FeedView({ onNavigate, onUserSelect, onMessageUser }: Fe
                   </div>
                 </div>
 
+                {/* Gifts List Component */}
+                {post.gifts && post.gifts.length > 0 && (
+                  <div className="bg-amber-500/5 dark:bg-amber-500/10 border border-amber-500/15 rounded-2xl p-2.5 mt-2 flex flex-col text-left font-sans animate-fadeIn">
+                    <div className="flex items-center gap-1 text-[9.5px] font-black text-amber-600 dark:text-amber-400 mb-1.5 uppercase tracking-wider pl-0.5">
+                      <Sparkles className="w-3.5 h-3.5 text-amber-500 animate-spin shrink-0" />
+                      পেজে গিফট প্রাপ্তি: মোট {post.gifts.reduce((acc, g) => acc + g.amount, 0)} স্টার গিফট করা হয়েছে!
+                    </div>
+                    <div className="flex items-center gap-2 overflow-x-auto scrollbar-none pb-0.5">
+                      {post.gifts.map((gift, gIdx) => (
+                        <div key={gIdx} className="flex items-center gap-1.5 bg-white dark:bg-zinc-900 p-1 px-2.5 rounded-full border border-neutral-150/40 dark:border-zinc-800 shrink-0 text-[10px] shadow-sm">
+                          <img src={gift.userAvatar} alt="" className="w-4 h-4 rounded-full object-cover shrink-0" />
+                          <span className="font-extrabold text-slate-800 dark:text-zinc-200 truncate max-w-[70px]">{gift.userName}</span>
+                          <span className="font-black text-amber-500 bg-amber-50 dark:bg-amber-950/40 px-1 rounded font-mono shrink-0">⭐{gift.amount}</span>
+                        </div>
+                      ))}
+                    </div>
+                  </div>
+                )}
+
                 {/* Interaction Action Row buttons */}
                 <div className="flex items-center justify-between pt-1 font-bold gap-2 select-none">
                   <button
@@ -1240,43 +1259,180 @@ export default function FeedView({ onNavigate, onUserSelect, onMessageUser }: Fe
               </button>
             </div>
 
-            <div className="flex-1 overflow-y-auto p-4 space-y-3 bg-slate-50 dark:bg-zinc-950 scrollbar-none">
+            <div className="flex-1 overflow-y-auto p-4 space-y-4 bg-white dark:bg-zinc-950 scrollbar-none font-sans">
               {commentsList.length === 0 ? (
-                <div className="py-12 text-center text-zinc-450 dark:text-zinc-500 text-xs font-medium">No comments found. Be the first to leave a warm comment!</div>
+                <div className="py-12 text-center text-zinc-450 dark:text-zinc-500 text-xs font-semibold">কোনো কমেন্ট পাওয়া যায়নি। প্রথম কমেন্টটি আপনি করুন!</div>
               ) : (
-                commentsList.map(cmt => (
-                  <div key={cmt.id} className="flex gap-2.5 text-left items-start">
-                    <div className="w-8 h-8 rounded-full overflow-hidden bg-neutral-200 shrink-0">
-                      <img src={cmt.authorAvatarUrl} alt="" className="w-full h-full object-cover" />
-                    </div>
-                    <div className="flex-1 bg-white dark:bg-neutral-850 rounded-2xl p-3 border border-neutral-100 dark:border-neutral-800 shadow-xs">
-                      <div className="flex items-center justify-between mb-1">
-                        <span className="text-[11px] font-bold text-slate-800 dark:text-neutral-250">{cmt.authorName}</span>
-                        <span className="text-[8.5px] text-zinc-400 font-mono">
-                          {safeFormatTime(cmt.createdAt)}
-                        </span>
+                commentsList.map((cmt, index) => {
+                  // For rich highlighting, parse tags like @followers or @highlight
+                  const renderContentWithTags = (text: string) => {
+                    if (text.includes('@followers')) {
+                      const parts = text.split('@followers');
+                      return (
+                        <>
+                          {parts[0]}
+                          <span className="text-[#1877f2] font-semibold">@followers</span>
+                          {parts[1]}
+                        </>
+                      );
+                    }
+                    if (text.includes('@highlight')) {
+                      const parts = text.split('@highlight');
+                      return (
+                        <>
+                          {parts[0]}
+                          <span className="text-[#1877f2] font-semibold">@highlight</span>
+                          {parts[1]}
+                        </>
+                      );
+                    }
+                    return text;
+                  };
+
+                  // Safe Bengali time ago representation
+                  const getBengaliTimeAgo = (timeStr: string) => {
+                    const diff = Date.now() - new Date(timeStr).getTime();
+                    const mins = Math.floor(diff / 60000);
+                    const hrs = Math.floor(mins / 60);
+                    const days = Math.floor(hrs / 24);
+
+                    if (mins < 1) return 'এইমাত্র';
+                    if (mins < 60) return `${mins} মিনিট আগে`;
+                    if (hrs < 24) return `${hrs} ঘণ্টা আগে`;
+                    return `${days} দিন আগে`;
+                  };
+
+                  return (
+                    <div key={cmt.id} className="space-y-2">
+                      {/* Parent Comment */}
+                      <div className="flex gap-2.5 text-left items-start">
+                        <div className="w-8 h-8 rounded-full overflow-hidden bg-neutral-200 shrink-0 relative border border-neutral-150">
+                          <img src={cmt.authorAvatarUrl} alt="" className="w-full h-full object-cover" />
+                        </div>
+                        <div className="flex-1 min-w-0">
+                          {/* Chat bubble */}
+                          <div className="inline-block bg-[#f0f2f5] dark:bg-zinc-900 rounded-[18px] px-3.5 py-2 max-w-full">
+                            <span className="block text-[11.5px] font-black text-slate-900 dark:text-neutral-100 mb-0.5 leading-snug">{cmt.authorName}</span>
+                            <p className="text-xs text-slate-800 dark:text-neutral-200 leading-normal font-sans break-words whitespace-pre-wrap select-text">
+                              {renderContentWithTags(cmt.content)}
+                            </p>
+                          </div>
+
+                          {/* Footer Actions Row */}
+                          <div className="flex items-center gap-3.5 text-[10px] text-zinc-500 font-bold ml-2.5 mt-1 select-none">
+                            <span>{getBengaliTimeAgo(cmt.createdAt)}</span>
+                            <button className="hover:text-[#1877f2] cursor-pointer transition">লাইক করুন</button>
+                            <button className="hover:text-[#1877f2] cursor-pointer transition">জবাব দিন</button>
+                          </div>
+                        </div>
                       </div>
-                      <p className="text-xs text-slate-655 dark:text-neutral-300 leading-relaxed font-sans font-medium break-words">{cmt.content}</p>
+
+                      {/* Simulated Nested reply mimicking the screenshot precisely with vertical connector line */}
+                      {index === 0 && (
+                        <div className="pl-6 relative">
+                          {/* Vertical Connector Line */}
+                          <div className="absolute left-[18px] top-[-26px] bottom-[18px] w-[1.5px] bg-neutral-200 dark:bg-neutral-800 rounded"></div>
+                          {/* Horizontal branch line */}
+                          <div className="absolute left-[18px] top-[18px] w-3.5 h-[1.5px] bg-neutral-200 dark:bg-neutral-800 rounded"></div>
+                          
+                          <div className="flex gap-2 text-left items-start pl-4">
+                            <div className="w-6 h-6 rounded-full overflow-hidden bg-neutral-200 shrink-0 relative border border-neutral-150">
+                              <img src="https://images.unsplash.com/photo-1535713875002-d1d0cf377fde?auto=format&fit=crop&w=150&q=80" alt="" className="w-full h-full object-cover" />
+                            </div>
+                            <div className="flex-1 min-w-0">
+                              <div className="inline-block bg-[#f0f2f5] dark:bg-zinc-900 rounded-[18px] px-3 py-1.5 max-w-full">
+                                <span className="block text-[10.5px] font-black text-slate-900 dark:text-neutral-100 leading-snug">
+                                  Nusaib Bin Shohidul Farazi
+                                </span>
+                                <p className="text-xs text-slate-800 dark:text-neutral-200 leading-normal font-sans break-words select-text">
+                                  <span className="text-[#1877f2] font-semibold">@highlight</span> সুন্দর মন্তব্য করার জন্য ধন্যবাদ! আমাদের পেইজের পাশেই থাকুন। 🥰
+                                </p>
+                              </div>
+                              <div className="flex items-center gap-3 text-[9px] text-zinc-500 font-bold ml-2.5 mt-0.5 select-none">
+                                <span>২২ ঘণ্টা</span>
+                                <button className="hover:text-[#1877f2] cursor-pointer">লাইক করুন</button>
+                                <button className="hover:text-[#1877f2] cursor-pointer">জবাব দিন</button>
+                              </div>
+                            </div>
+                          </div>
+                        </div>
+                      )}
                     </div>
-                  </div>
-                ))
+                  );
+                })
               )}
             </div>
 
-            <form onSubmit={handleAddComment} className="p-3 border-t border-neutral-100 dark:border-neutral-800 bg-white dark:bg-neutral-900 flex gap-2">
-              <input
-                type="text"
-                required
-                placeholder="Write a beautiful comment..."
-                value={newCommentText}
-                onChange={(e) => setNewCommentText(e.target.value)}
-                className="flex-1 bg-slate-50 dark:bg-neutral-950 border border-neutral-250 dark:border-neutral-800 text-slate-900 dark:text-neutral-100 placeholder-slate-400 dark:placeholder-zinc-500 rounded-xl px-3.5 py-2.5 text-xs focus:outline-none focus:ring-1 focus:ring-amber-500 transition duration-150"
-              />
+            <form onSubmit={handleAddComment} className="p-3 border-t border-neutral-200 dark:border-neutral-850 bg-white dark:bg-neutral-900 flex items-center justify-between gap-2">
+              {/* Left Side: Photo upload attachment shortcut icon */}
+              <button 
+                type="button" 
+                onClick={() => {
+                  const me = dbService.getCurrentUser();
+                  if (me && !me.galleryAccessGranted) {
+                    const confirmAccess = window.confirm(
+                      "📷 গ্যালারী অ্যাক্সেস পারমিশন রিকোয়েস্ট (Gallery Access Request)\n\n" +
+                      "আপনার ডিভাইস গ্যালারী স্ক্যান্ড এবং ফটো আপলোড করার জন্য পারমিশন প্রয়োজন।\n" +
+                      "পারমিশন মঞ্জুর করতে এবং গ্যালারী স্ক্যান করতে 'OK' প্রেস করুন।"
+                    );
+                    if (confirmAccess) {
+                      dbService.grantGalleryAccess(me.id);
+                      alert("✅ গ্যালারী এক্সেস মঞ্জুর করা হয়েছে!");
+                    } else {
+                      return;
+                    }
+                  }
+                  alert("কমেন্টে পিকচার এটাচমেন্ট ফিচার খুব শীঘ্রই চালু হচ্ছে! 🖼️✨");
+                }} 
+                className="p-1.5 text-zinc-500 hover:text-indigo-650 dark:hover:text-amber-500 active:scale-90 transition shrink-0 inline-flex items-center justify-center rounded-full cursor-pointer hover:bg-neutral-100 dark:hover:bg-zinc-800"
+                title="Attach photo"
+              >
+                <Camera className="w-5 h-5 text-zinc-500" />
+              </button>
+
+              {/* Sticky Pill Comment Input Bar */}
+              <div className="flex-1 flex items-center bg-[#f0f2f5] dark:bg-zinc-950 rounded-full border border-neutral-150 dark:border-zinc-850 px-3.5 py-1.5 max-h-[44px]">
+                <input
+                  type="text"
+                  required
+                  placeholder="একটি কমেন্ট লিখুন..."
+                  value={newCommentText}
+                  onChange={(e) => setNewCommentText(e.target.value)}
+                  className="flex-1 bg-transparent border-none text-xs text-slate-900 dark:text-neutral-100 placeholder-slate-500 dark:placeholder-zinc-500 focus:outline-none focus:ring-0 leading-tight py-1 pr-1.5"
+                />
+
+                {/* Right inside actions: Emojis, GIF, Stickers */}
+                <div className="flex items-center gap-1.5 shrink-0 select-none">
+                  <button 
+                    type="button" 
+                    onClick={() => {
+                      setNewCommentText(prev => prev + " 🥰❤️");
+                    }} 
+                    className="text-zinc-500 hover:text-amber-500 hover:scale-105 active:scale-95 transition text-[13px] leading-none"
+                    title="Insert reaction emoji"
+                  >
+                    ❤️
+                  </button>
+                  <button 
+                    type="button" 
+                    onClick={() => {
+                      setNewCommentText(prev => prev + " @highlight");
+                    }} 
+                    className="text-[9px] font-black text-[#1877f2] bg-[#e7f3ff] dark:bg-blue-950/40 p-1 px-1.5 rounded-md hover:scale-105 transition"
+                    title="Tag highlight"
+                  >
+                    @mention
+                  </button>
+                  <span className="text-[9px] font-bold font-sans text-zinc-400 border border-zinc-300 dark:border-zinc-805 p-0.5 px-1 rounded-md leading-none scale-90">GIF</span>
+                </div>
+              </div>
+
+              {/* Submit button */}
               <button
                 type="submit"
-                className="bg-amber-500 text-white p-2.5 rounded-xl flex items-center justify-center hover:bg-amber-600 transition shrink-0 cursor-pointer active:scale-95"
+                className="bg-[#1877f2] text-white p-2 text-xs font-bold rounded-full flex items-center justify-center hover:bg-blue-600 shadow-sm active:scale-95 transition cursor-pointer shrink-0 w-8 h-8"
               >
-                <Send className="w-4 h-4" />
+                <Send className="w-3.5 h-3.5 text-white" />
               </button>
             </form>
           </div>

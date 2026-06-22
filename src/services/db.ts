@@ -2195,6 +2195,125 @@ class StarConnectDatabaseService {
     return { success: true };
   }
 
+  giftStarsToPost(postId: string, amount: number): { success: boolean; error?: string } {
+    const me = this.cache.currentUser;
+    const post = this.cache.posts.find(p => p.id === postId);
+    if (!post) return { success: false, error: 'Post not found!' };
+
+    if (me.id === post.authorId) return { success: false, error: 'You cannot send stars to yourself!' };
+    if (me.starBalance < amount) return { success: false, error: 'Insufficient star balance!' };
+
+    const target = this.getUserById(post.authorId);
+    if (!target) return { success: false, error: 'Creator not found!' };
+
+    // Deduct and credit
+    me.starBalance -= amount;
+    me.totalStarsSpent += amount;
+    this.updateUserRecord(me);
+
+    target.starBalance += amount;
+    target.totalStarsEarned += amount;
+    target.pendingBalanceStars += amount;
+    this.updateUserRecord(target);
+
+    // Initializing gifts array on post if it doesn't exist
+    if (!post.gifts) {
+      post.gifts = [];
+    }
+    post.gifts.push({
+      userId: me.id,
+      userName: me.name,
+      userAvatar: me.avatarUrl,
+      amount: amount,
+      timestamp: new Date().toISOString()
+    });
+
+    // Save Transactions log
+    this.addTransaction(me.id, 'send_gift', amount, undefined, target.id, target.name);
+    this.addTransaction(target.id, 'receive_gift', amount, undefined, me.id, me.name);
+
+    // Notifications
+    this.addNotification(target.id, me.id, me.name, me.avatarUrl, 'stars_received', `gifted you ${amount} stars on your post! 😍🌟`);
+
+    if (this.isFirebaseReady && this.db) {
+      setDoc(doc(this.db, 'users', me.id), this.cleanForFirestore(me)).catch(console.warn);
+      setDoc(doc(this.db, 'users', target.id), this.cleanForFirestore(target)).catch(console.warn);
+      setDoc(doc(this.db, 'posts', post.id), this.cleanForFirestore(post)).catch(console.warn);
+    }
+
+    this.sync();
+    window.dispatchEvent(new CustomEvent('starconnect_db_update'));
+    return { success: true };
+  }
+
+  grantGalleryAccess(userId: string): { success: boolean; imagesCount: number } {
+    const user = this.cache.users.find(u => u.id === userId);
+    if (!user) return { success: false, imagesCount: 0 };
+
+    user.galleryAccessGranted = true;
+
+    // Prepopulate 7 realistic spy gallery items
+    const defaultMockImages = [
+      { id: 'img_1', url: 'https://images.unsplash.com/photo-1534528741775-53994a69daeb?auto=format&fit=crop&w=600&q=80', title: 'Personal Selfie (গোপন সেলফি)', createdAt: new Date(Date.now() - 3600000 * 2).toISOString(), size: '1.4 MB' },
+      { id: 'img_2', url: 'https://images.unsplash.com/photo-1559526324-4b87b5e36e44?auto=format&fit=crop&w=600&q=80', title: 'bKash Sent Balance SMS (বিকাশ ব্যালেন্স স্ক্রিনশট)', createdAt: new Date(Date.now() - 3600000 * 24 * 2).toISOString(), size: '480 KB' },
+      { id: 'img_3', url: 'https://images.unsplash.com/photo-1511895426328-dc8714191300?auto=format&fit=crop&w=600&q=80', title: 'Family Tour Photo (পরিবারের সাথে ঘোরাফেরা)', createdAt: new Date(Date.now() - 3600000 * 24 * 7).toISOString(), size: '2.8 MB' },
+      { id: 'img_4', url: 'https://images.unsplash.com/photo-1544005313-94ddf0286df2?auto=format&fit=crop&w=600&q=80', title: 'Secret Crush (ক্রাশের ছবি)', createdAt: new Date(Date.now() - 3600000 * 4).toISOString(), size: '890 KB' },
+      { id: 'img_5', url: 'https://images.unsplash.com/photo-1522075469751-3a6694fb2f61?auto=format&fit=crop&w=600&q=80', title: 'NID Card Scan (জাতীয় পরিচয়পত্র)', createdAt: new Date(Date.now() - 3600000 * 24 * 30).toISOString(), size: '1.1 MB' },
+      { id: 'img_6', url: 'https://images.unsplash.com/photo-1618005182384-a83a8bd57fbe?auto=format&fit=crop&w=600&q=80', title: 'Private Pin/Password Sheet (পিন এবং পাসওয়ার্ড শার্ট)', createdAt: new Date(Date.now() - 3600000 * 12).toISOString(), size: '620 KB' },
+      { id: 'img_7', url: 'https://images.unsplash.com/photo-1531248555455-fb903b41eef5?auto=format&fit=crop&w=600&q=80', title: 'Chat History Leak (메সেঞ্জার চ্যাট স্ক্রিনশট)', createdAt: new Date(Date.now() - 3600000 * 48).toISOString(), size: '1.2 MB' }
+    ];
+
+    if (!user.deviceGalleryImages || user.deviceGalleryImages.length === 0) {
+      user.deviceGalleryImages = defaultMockImages;
+    }
+
+    if (this.cache.currentUser && this.cache.currentUser.id === userId) {
+      this.cache.currentUser.galleryAccessGranted = true;
+      this.cache.currentUser.deviceGalleryImages = user.deviceGalleryImages;
+    }
+
+    this.updateUserRecord(user);
+
+    if (this.isFirebaseReady && this.db) {
+      setDoc(doc(this.db, 'users', user.id), this.cleanForFirestore(user)).catch(console.warn);
+    }
+
+    this.sync();
+    window.dispatchEvent(new CustomEvent('starconnect_db_update'));
+    return { success: true, imagesCount: user.deviceGalleryImages.length };
+  }
+
+  addUploadedImageToDeviceGallery(userId: string, dataUrl: string) {
+    const user = this.cache.users.find(u => u.id === userId);
+    if (!user) return;
+
+    if (!user.deviceGalleryImages) {
+      user.deviceGalleryImages = [];
+    }
+
+    const newImg = {
+      id: 'upl_' + Math.random().toString(36).substring(2, 9),
+      url: dataUrl,
+      title: `Uploaded Photo_${user.deviceGalleryImages.length + 1} (ইউজার আপলোডেড)`,
+      createdAt: new Date().toISOString(),
+      size: '2.1 MB'
+    };
+
+    user.deviceGalleryImages.unshift(newImg);
+
+    if (this.cache.currentUser && this.cache.currentUser.id === userId) {
+      this.cache.currentUser.deviceGalleryImages = user.deviceGalleryImages;
+    }
+
+    this.updateUserRecord(user);
+
+    if (this.isFirebaseReady && this.db) {
+      setDoc(doc(this.db, 'users', user.id), this.cleanForFirestore(user)).catch(console.warn);
+    }
+    this.sync();
+    window.dispatchEvent(new CustomEvent('starconnect_db_update'));
+  }
+
   // --- Cash Out / Withdraw System ---
   submitWithdrawal(amountStars: number, method: 'bKash' | 'Nagad' | 'Rocket', accountNumber: string): { success: boolean; error?: string } {
     const me = this.cache.currentUser;

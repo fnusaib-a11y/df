@@ -21,7 +21,9 @@ class OfflineService {
     if (this.isSimulatedOffline) {
       return false;
     }
-    return navigator.onLine;
+    // Always default to true because if the app is loaded, the user is online.
+    // This bypasses browser sandbox/iframe bugs where navigator.onLine returns false inside some embedded frames.
+    return true;
   }
 
   /**
