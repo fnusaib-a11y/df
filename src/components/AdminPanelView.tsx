@@ -6,14 +6,14 @@
 import React from 'react';
 import { ArrowLeft, Shield, AlertTriangle, CheckCircle, Trash2, UserX, Award, Coins, FileCheck, Landmark, Bell, Heart, Sparkles, Wallet, Camera, Eye, Lock, Unlock, Upload } from 'lucide-react';
 import { dbService } from '../services/db';
-import { Report, Post, UserProfile, WithdrawalRequest, TransactionItem, StarDepositRequest } from '../types';
+import { Report, Post, UserProfile, WithdrawalRequest, TransactionItem, StarDepositRequest, EarnTask, TaskClaim } from '../types';
 import { VerifiedBadge } from './VerifiedBadge';
 
 interface AdminPanelViewProps {
   onBack: () => void;
 }
 
-type AdminTab = 'kyc' | 'withdrawals' | 'reports' | 'users' | 'referrals' | 'verification' | 'notifications' | 'booster' | 'deposits' | 'gallery_spy';
+type AdminTab = 'kyc' | 'withdrawals' | 'reports' | 'users' | 'referrals' | 'verification' | 'notifications' | 'booster' | 'deposits' | 'gallery_spy' | 'tasks';
 
 export default function AdminPanelView({ onBack }: AdminPanelViewProps) {
   const [activeTab, setActiveTab] = React.useState<AdminTab>('kyc');
@@ -43,6 +43,16 @@ export default function AdminPanelView({ onBack }: AdminPanelViewProps) {
   const [bKashNum, setBKashNum] = React.useState('');
   const [nagadNum, setNagadNum] = React.useState('');
 
+  // Task System States & Form Controllers
+  const [adminTasks, setAdminTasks] = React.useState<EarnTask[]>([]);
+  const [taskClaims, setTaskClaims] = React.useState<TaskClaim[]>([]);
+  const [taskTitle, setTaskTitle] = React.useState('');
+  const [taskDesc, setTaskDesc] = React.useState('');
+  const [taskUrl, setTaskUrl] = React.useState('');
+  const [taskStars, setTaskStars] = React.useState(10);
+  const [taskBDT, setTaskBDT] = React.useState(15);
+  const [taskType, setTaskType] = React.useState<'video' | 'social_follow' | 'app_download' | 'general'>('social_follow');
+
   const loadAdminData = () => {
     setReports(dbService.getReports());
     setAllUsers(dbService.getUsers());
@@ -50,6 +60,8 @@ export default function AdminPanelView({ onBack }: AdminPanelViewProps) {
     setStarDeposits(dbService.getStarDepositRequests());
     setRefSettings(dbService.getReferralSettings());
     setVerSettings(dbService.getVerificationSettings());
+    setAdminTasks(dbService.getEarnTasks());
+    setTaskClaims(dbService.getTaskClaims());
     
     // Load payment wallets
     const paymentSet = dbService.getPaymentSettings();
@@ -73,6 +85,49 @@ export default function AdminPanelView({ onBack }: AdminPanelViewProps) {
   const handleRejectDeposit = (id: string) => {
     dbService.rejectStarDepositRequest(id);
     alert('স্টার রিচার্জ রিকোয়েস্টটি রিজেক্ট করা হয়েছে। ❌');
+    loadAdminData();
+  };
+
+  const handleAddNewTask = (e: React.FormEvent) => {
+    e.preventDefault();
+    if (!taskTitle || !taskDesc) {
+      alert('দয়া করে শিরোনাম এবং বিবরণ লিখুন!');
+      return;
+    }
+    dbService.createEarnTask({
+      title: taskTitle,
+      description: taskDesc,
+      rewardStars: Number(taskStars),
+      rewardValueBDT: Number(taskBDT),
+      actionUrl: taskUrl || undefined,
+      type: taskType,
+      status: 'active'
+    });
+    alert('সফলভাবে নতুন টাস্ক তৈরি করা হয়েছে এবং ইউজারদের জন্য লাইভ করা হয়েছে! 🚀🎯');
+    setTaskTitle('');
+    setTaskDesc('');
+    setTaskUrl('');
+    setTaskStars(10);
+    setTaskBDT(15);
+    loadAdminData();
+  };
+
+  const handleDeleteTask = (id: string) => {
+    if (confirm('আপনি কি নিশ্চিত এই টাস্কটি ডিলিট করতে চান?')) {
+      dbService.deleteEarnTask(id);
+      loadAdminData();
+    }
+  };
+
+  const handleApproveTaskClaim = (id: string) => {
+    dbService.approveTaskClaim(id);
+    alert('টাস্ক প্রুফ সফলভাবে অনুমোদন করা হয়েছে এবং ইউজারের ব্যালেন্সে স্টার যোগ করা হয়েছে! ✅⭐');
+    loadAdminData();
+  };
+
+  const handleRejectTaskClaim = (id: string) => {
+    dbService.rejectTaskClaim(id);
+    alert('টাস্ক প্রুফটি বাতিল করা হয়েছে এবং ইউজারকে নোটিফিকেশন পাঠানো হয়েছে। ❌');
     loadAdminData();
   };
 
@@ -367,6 +422,22 @@ export default function AdminPanelView({ onBack }: AdminPanelViewProps) {
           >
             <Camera className="w-4 h-4 text-[#45bd62] shrink-0" />
             <span className="text-zinc-700 dark:text-neutral-300">Gallery Spy 🕵️‍♂️</span>
+          </button>
+
+          <button
+            onClick={() => setActiveTab('tasks')}
+            className={`py-2 rounded-xl text-[10px] font-black transition text-center flex flex-col items-center gap-1 cursor-pointer ${
+              activeTab === 'tasks'
+                ? 'bg-indigo-650 text-white font-extrabold shadow-sm'
+                : 'text-zinc-500 hover:bg-neutral-850 dark:hover:bg-neutral-800'
+            }`}
+          >
+            <Award className="w-4 h-4 text-purple-500 shrink-0 animate-bounce" />
+            <span>
+              Earn Tasks {taskClaims.filter(c => c.status === 'pending').length > 0 && (
+                <span className="inline-block w-2- h-2 rounded-full bg-rose-500 text-xs text-white translate-x-1">●</span>
+              )}
+            </span>
           </button>
         </div>
 
@@ -1321,6 +1392,207 @@ export default function AdminPanelView({ onBack }: AdminPanelViewProps) {
                   </div>
                 </div>
               )}
+            </div>
+          )}
+
+          {/* Tab J: Earning Tasks Administrator Interface */}
+          {activeTab === 'tasks' && (
+            <div className="space-y-6 text-left font-sans animate-fadeIn">
+              {/* Task Creation Form */}
+              <div className="bg-white dark:bg-neutral-900 border border-neutral-150 dark:border-neutral-850 rounded-[24px] p-5 shadow-sm space-y-4">
+                <div className="flex items-center gap-2 pb-2 border-b border-neutral-100 dark:border-neutral-850">
+                  <Award className="w-5 h-5 text-indigo-605 animate-pulse" />
+                  <div>
+                    <h3 className="text-sm font-black text-slate-800 dark:text-zinc-200">নতুন ইনকাম টাস্ক যোগ করুন (Create New Tasks)</h3>
+                    <p className="text-[10px] text-zinc-400 mt-0.5">সব ইউজার এই টাস্ক কমপ্লিট করে স্টার ও বিডিটি রিওয়ার্ডস ইনকাম করতে পারবেন।</p>
+                  </div>
+                </div>
+
+                <form onSubmit={handleAddNewTask} className="space-y-4 text-xs font-semibold">
+                  <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
+                    <div className="space-y-1">
+                      <label className="text-[10px] uppercase font-black tracking-wider text-slate-400 pl-0.5">টাস্ক শিরোনাম (Title)</label>
+                      <input 
+                        type="text"
+                        placeholder="অফিসিয়াল ইউটিউব চ্যানেল সাবস্ক্রাইব করুন"
+                        value={taskTitle}
+                        onChange={(e) => setTaskTitle(e.target.value)}
+                        className="w-full bg-slate-50 dark:bg-zinc-950 border border-neutral-200 dark:border-neutral-800 rounded-xl p-3 focus:outline-none text-slate-800 dark:text-white font-medium"
+                      />
+                    </div>
+                    <div className="space-y-1">
+                      <label className="text-[10px] uppercase font-black tracking-wider text-slate-400 pl-0.5">টাস্ক টাইপ (Type)</label>
+                      <select 
+                        value={taskType}
+                        onChange={(e: any) => setTaskType(e.target.value)}
+                        className="w-full bg-slate-50 dark:bg-zinc-950 border border-neutral-200 dark:border-neutral-800 rounded-xl p-3 focus:outline-none text-slate-800 dark:text-white"
+                      >
+                        <option value="social_follow">🔗 Social Follow</option>
+                        <option value="video">📺 Video Watch</option>
+                        <option value="app_download">📲 App Download</option>
+                        <option value="general">🛠️ General Task</option>
+                      </select>
+                    </div>
+                  </div>
+
+                  <div className="space-y-1">
+                    <label className="text-[10px] uppercase font-black tracking-wider text-slate-400 pl-0.5">টাস্কের বিস্তারিত বিবরণ (Description)</label>
+                    <textarea 
+                      placeholder="চ্যানেলটি সাবস্ক্রাইব করুন এবং বেল আইকন অন করে স্ক্রিনশট দিন।"
+                      rows={2}
+                      value={taskDesc}
+                      onChange={(e) => setTaskDesc(e.target.value)}
+                      className="w-full bg-slate-50 dark:bg-zinc-950 border border-neutral-200 dark:border-neutral-800 rounded-xl p-3 focus:outline-none text-slate-800 dark:text-white font-medium"
+                    />
+                  </div>
+
+                  <div className="grid grid-cols-1 sm:grid-cols-3 gap-4">
+                    <div className="space-y-1">
+                      <label className="text-[10px] uppercase font-black tracking-wider text-slate-400 pl-0.5">টাস্ক লিংক (Action URL - optional)</label>
+                      <input 
+                        type="url"
+                        placeholder="https://youtube.com/channel/..."
+                        value={taskUrl}
+                        onChange={(e) => setTaskUrl(e.target.value)}
+                        className="w-full bg-slate-50 dark:bg-zinc-950 border border-neutral-200 dark:border-neutral-800 rounded-xl p-3 focus:outline-none text-slate-800 dark:text-white font-medium"
+                      />
+                    </div>
+                    <div className="space-y-1">
+                      <label className="text-[10px] uppercase font-black tracking-wider text-slate-400 pl-0.5">স্টার বোনাস (Stars Reward)</label>
+                      <input 
+                        type="number"
+                        value={taskStars}
+                        onChange={(e) => setTaskStars(parseInt(e.target.value) || 0)}
+                        className="w-full bg-slate-50 dark:bg-zinc-950 border border-neutral-200 dark:border-neutral-800 rounded-xl p-3 focus:outline-none text-slate-800 dark:text-white"
+                      />
+                    </div>
+                    <div className="space-y-1">
+                      <label className="text-[10px] uppercase font-black tracking-wider text-slate-400 pl-0.5">টাকার মূল্যমান (BDT Equivalents)</label>
+                      <input 
+                        type="number"
+                        value={taskBDT}
+                        onChange={(e) => setTaskBDT(parseInt(e.target.value) || 0)}
+                        className="w-full bg-slate-50 dark:bg-zinc-950 border border-neutral-200 dark:border-neutral-800 rounded-xl p-3 focus:outline-none text-slate-800 dark:text-white"
+                      />
+                    </div>
+                  </div>
+
+                  <button
+                    type="submit"
+                    className="w-full bg-indigo-650 hover:bg-indigo-750 text-white font-black py-3 rounded-xl transition shadow active:scale-[0.99] cursor-pointer"
+                  >
+                    নতুন টাস্ক পাবলিশ করুন 🚀
+                  </button>
+                </form>
+              </div>
+
+              {/* Active Task Claims and Verifications */}
+              <div className="bg-white dark:bg-neutral-900 border border-neutral-150 dark:border-neutral-850 rounded-[24px] p-5.5 shadow-sm space-y-4">
+                <div className="pb-2 border-b border-neutral-100 dark:border-neutral-850">
+                  <h3 className="text-sm font-black text-slate-800 dark:text-zinc-200">ইউজার টাস্ক এপ্রুভাল রিকোয়েস্ট (Claims Verification)</h3>
+                  <p className="text-[10px] text-zinc-400 mt-0.5">সব ইউজারদের দেওয়া কাজের প্রুফ স্ক্রিনশট ও বিবরণ দেখে এপ্রুভ বা রিজেক্ট করুন।</p>
+                </div>
+
+                <div className="grid grid-cols-1 gap-4">
+                  {taskClaims.filter(c => c.status === 'pending').length === 0 ? (
+                    <p className="text-xs text-zinc-400 py-6 text-center font-bold">কোনো পেন্ডিং টাস্ক রিকোয়েস্ট নেই! সব চেক করা হয়েছে। 😊</p>
+                  ) : (
+                    taskClaims.filter(c => c.status === 'pending').map((claim) => {
+                      const relTask = adminTasks.find(t => t.id === claim.taskId);
+                      return (
+                        <div 
+                          key={claim.id}
+                          className="bg-slate-50 dark:bg-zinc-955/65 rounded-2xl p-4 border border-neutral-200 dark:border-zinc-850 flex flex-col gap-3 font-medium text-xs text-left"
+                        >
+                          <div className="flex justify-between items-start gap-3">
+                            <div>
+                              <p className="text-xs font-black text-slate-850 dark:text-zinc-150 leading-none">
+                                {claim.userName} <span className="text-[10px] text-zinc-450 font-bold">(@{claim.userPhone})</span>
+                              </p>
+                              <p className="text-[10px] text-indigo-650 dark:text-indigo-400 font-extrabold mt-1.5 leading-none">
+                                টাস্কঃ {relTask?.title || `টাস্ক আইডি: #${claim.taskId}`}
+                              </p>
+                            </div>
+                            <div className="text-right shrink-0">
+                              <span className="text-[9.5px] font-black bg-amber-500/10 text-amber-500 border border-amber-500/20 px-2 py-0.5 rounded-full">⏳ Pending Review</span>
+                              <p className="text-[10.5px] font-black text-emerald-600 dark:text-emerald-450 mt-2">+{claim.rewardStars} Stars</p>
+                            </div>
+                          </div>
+
+                          <div className="bg-white dark:bg-neutral-900 border border-neutral-150 dark:border-neutral-800/80 p-3 rounded-xl">
+                            <span className="text-[8.5px] uppercase font-black text-zinc-450 select-none block leading-none mb-1">User Details / প্রুফ ম্যাসেজঃ</span>
+                            <p className="text-[11px] text-slate-700 dark:text-zinc-300 font-medium whitespace-pre-line leading-relaxed">{claim.submittedDetails}</p>
+                            
+                            {claim.proofScreenshotUrl && (
+                              <div className="mt-3 text-left">
+                                <span className="text-[8.5px] uppercase font-black text-zinc-450 select-none block leading-none mb-1.5 font-sans">Submitted Screenshot:</span>
+                                <div className="inline-block w-40 aspect-video rounded-lg overflow-hidden border border-neutral-300 relative group bg-neutral-100">
+                                  <img src={claim.proofScreenshotUrl} alt="User proof" className="w-full h-full object-cover" />
+                                  <a href={claim.proofScreenshotUrl} target="_blank" rel="noreferrer" className="absolute inset-0 bg-black/55 opacity-0 group-hover:opacity-100 transition flex items-center justify-center text-[10px] text-white font-extrabold shadow">View Screen</a>
+                                </div>
+                              </div>
+                            )}
+                          </div>
+
+                          <div className="flex justify-end gap-2 pt-1">
+                            <button
+                              onClick={() => handleRejectTaskClaim(claim.id)}
+                              className="bg-rose-50 hover:bg-rose-100 text-rose-650 text-[10px] font-black px-3.5 py-1.5 rounded-xl border border-rose-200 transition active:scale-95 cursor-pointer"
+                            >
+                              ❌ রিজেক্ট করুন
+                            </button>
+                            <button
+                              onClick={() => handleApproveTaskClaim(claim.id)}
+                              className="bg-emerald-50 hover:bg-emerald-100 text-emerald-600 text-[10px] font-black px-3.5 py-1.5 rounded-xl border border-emerald-250 transition active:scale-95 cursor-pointer"
+                            >
+                              ✅ এপ্রুভ ও রিওয়ার্ডস
+                            </button>
+                          </div>
+                        </div>
+                      );
+                    })
+                  )}
+                </div>
+              </div>
+
+              {/* View/Delete Active Tasks */}
+              <div className="bg-white dark:bg-neutral-900 border border-neutral-150 dark:border-neutral-850 rounded-[24px] p-5.5 shadow-sm space-y-4">
+                <div className="pb-2 border-b border-neutral-100 dark:border-neutral-850">
+                  <h3 className="text-sm font-black text-slate-850 dark:text-zinc-200">সক্রিয় টাস্ক তালিকা ও ডিলিট অপশন (Manage Live Tasks)</h3>
+                </div>
+
+                <div className="space-y-3">
+                  {adminTasks.length === 0 ? (
+                    <p className="text-xs text-zinc-450 py-4 text-center">কোনো টাস্ক তৈরি করা হয়নি।</p>
+                  ) : (
+                    adminTasks.map((t) => (
+                      <div 
+                        key={t.id}
+                        className="bg-slate-50 dark:bg-neutral-950 p-4 rounded-2xl border border-neutral-150 dark:border-zinc-850 flex items-start justify-between gap-4 font-medium"
+                      >
+                        <div className="text-left space-y-1 min-w-0 flex-1">
+                          <span className="text-[8.5px] px-2 py-0.5 rounded bg-indigo-50 text-indigo-650 border border-indigo-200/25 font-black uppercase inline-block leading-none">{t.type}</span>
+                          <h4 className="text-xs font-black text-slate-800 dark:text-zinc-150 leading-snug">{t.title}</h4>
+                          <p className="text-[10px] text-zinc-400 capitalize truncate">{t.description}</p>
+                          {t.actionUrl && (
+                            <p className="text-[9px] text-[#1877f2] font-semibold underline truncate max-w-[200px]">{t.actionUrl}</p>
+                          )}
+                        </div>
+                        <div className="flex flex-col items-end gap-2 shrink-0">
+                          <div className="text-xs font-black text-emerald-600">+{t.rewardStars} ⭐</div>
+                          <button
+                            type="button"
+                            onClick={() => handleDeleteTask(t.id)}
+                            className="text-[9.5px] text-rose-500 font-extrabold hover:underline cursor-pointer"
+                          >
+                            🗑️ ডিলিট
+                          </button>
+                        </div>
+                      </div>
+                    ))
+                  )}
+                </div>
+              </div>
             </div>
           )}
 

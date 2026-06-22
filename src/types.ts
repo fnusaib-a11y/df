@@ -18,7 +18,8 @@ export enum AppScreen {
   ADMIN_PANEL = 'ADMIN_PANEL',
   WALLET = 'WALLET',
   BUY_STARS = 'BUY_STARS',
-  WITHDRAW = 'WITHDRAW'
+  WITHDRAW = 'WITHDRAW',
+  TASKS = 'TASKS'
 }
 
 export type UserRole = 'user' | 'creator' | 'admin';
@@ -254,6 +255,33 @@ export interface StarDepositRequest {
   screenshotUrl?: string; // base64 or placeholder
   status: 'pending' | 'approved' | 'rejected';
   createdAt: string;
+}
+
+export interface EarnTask {
+  id: string;
+  title: string;
+  description: string;
+  rewardStars: number;
+  rewardValueBDT: number;
+  actionUrl?: string;
+  type: 'video' | 'social_follow' | 'app_download' | 'general';
+  status: 'active' | 'inactive';
+  createdAt: string;
+  completionsCount?: number;
+}
+
+export interface TaskClaim {
+  id: string;
+  taskId: string;
+  userId: string;
+  userName: string;
+  userPhone: string;
+  submittedDetails?: string;
+  proofScreenshotUrl?: string;
+  status: 'pending' | 'approved' | 'rejected';
+  createdAt: string;
+  rewardStars: number;
+  rewardValueBDT: number;
 }
 
 

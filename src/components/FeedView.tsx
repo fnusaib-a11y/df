@@ -70,7 +70,7 @@ interface FeedViewProps {
   onMessageUser?: (userId: string) => void;
 }
 
-export default function FeedView({ onNavigate, onUserSelect, onMessageUser }: FeedViewProps) {
+function FeedViewComponent({ onNavigate, onUserSelect, onMessageUser }: FeedViewProps) {
   const isOnline = useOnlineStatus();
   const [activeCategory, setActiveCategory] = React.useState('All');
   const [posts, setPosts] = React.useState<Post[]>([]);
@@ -555,17 +555,19 @@ export default function FeedView({ onNavigate, onUserSelect, onMessageUser }: Fe
 
   const unreadNotifs = notifications.filter(n => !n.isRead).length;
 
-  const filteredPosts = posts.filter(post => {
-    if (myProfile && myProfile.blockedUsers?.includes(post.authorId)) return false;
-    if (searchPostQuery.trim()) {
-      const q = searchPostQuery.toLowerCase();
-      const titleMatches = post.title?.toLowerCase().includes(q);
-      const contentMatches = post.content.toLowerCase().includes(q);
-      const authorMatches = post.authorName.toLowerCase().includes(q);
-      if (!titleMatches && !contentMatches && !authorMatches) return false;
-    }
-    return true;
-  });
+  const filteredPosts = React.useMemo(() => {
+    return posts.filter(post => {
+      if (myProfile && myProfile.blockedUsers?.includes(post.authorId)) return false;
+      if (searchPostQuery.trim()) {
+        const q = searchPostQuery.toLowerCase();
+        const titleMatches = post.title?.toLowerCase().includes(q);
+        const contentMatches = post.content.toLowerCase().includes(q);
+        const authorMatches = post.authorName.toLowerCase().includes(q);
+        if (!titleMatches && !contentMatches && !authorMatches) return false;
+      }
+      return true;
+    });
+  }, [posts, myProfile, searchPostQuery]);
 
   if (!myProfile) return null;
 
@@ -1851,3 +1853,5 @@ export default function FeedView({ onNavigate, onUserSelect, onMessageUser }: Fe
     </div>
   );
 }
+
+export default React.memo(FeedViewComponent);

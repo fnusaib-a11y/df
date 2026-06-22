@@ -56,7 +56,7 @@ const parsePostContentForProfile = (content: string) => {
   return { gradientId: null, cleanContent: content };
 };
 
-export default function ProfileView({ onNavigate, onEditProfile, editProfileOpen, onEditProfileClose, onPostSelect, onChatWithUser, userId }: ProfileViewProps) {
+function ProfileViewComponent({ onNavigate, onEditProfile, editProfileOpen, onEditProfileClose, onPostSelect, onChatWithUser, userId }: ProfileViewProps) {
   const loggedInUser = dbService.getCurrentUser();
   const isOwnProfile = !userId || userId === loggedInUser?.id;
 
@@ -697,3 +697,5 @@ export default function ProfileView({ onNavigate, onEditProfile, editProfileOpen
     </div>
   );
 }
+
+export default React.memo(ProfileViewComponent);

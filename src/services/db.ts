@@ -19,7 +19,9 @@ import {
   ReferralSettings,
   VerificationSettings,
   FriendRequest,
-  StarDepositRequest
+  StarDepositRequest,
+  EarnTask,
+  TaskClaim
 } from '../types';
 
 import { initializeApp } from 'firebase/app';
@@ -57,6 +59,8 @@ const STORAGE_KEYS = {
   FRIEND_REQUESTS: 'starconnect_friend_requests_db',
   STAR_DEPOSITS: 'starconnect_star_deposits_db',
   PAYMENT_SETTINGS: 'starconnect_payment_settings',
+  EARN_TASKS: 'starconnect_earn_tasks_db',
+  TASK_CLAIMS: 'starconnect_task_claims_db',
 };
 
 // Standard Star Packages
@@ -337,7 +341,34 @@ const BOOTSTRAP_DATA = {
   paymentSettings: {
     bKashNumber: '01712-345678 (Personal)',
     nagadNumber: '01998-765432 (Personal)'
-  }
+  },
+  earnTasks: [
+    {
+      id: 'task_1',
+      title: 'আমাদের ইউটিউব চ্যানেল সাবস্ক্রাইব করুন',
+      description: 'চ্যানেলটি সাবস্ক্রাইব করুন, পাশের বেল বাটনটি বাজিয়ে দিন এবং প্রুফ হিসেবে স্ক্রিনশট আপলোড করুন।',
+      rewardStars: 10,
+      rewardValueBDT: 15,
+      actionUrl: 'https://youtube.com',
+      type: 'social_follow',
+      status: 'active',
+      createdAt: new Date().toISOString(),
+      completionsCount: 2
+    },
+    {
+      id: 'task_2',
+      title: 'আমাদের অফিসিয়াল অ্যাপ ফোনে ইন্সটল করুন',
+      description: 'অফিসিয়াল অ্যাপ ডাউনলোড ও সেটআপ করে একটি ৫-স্টার রিভিউ দিয়ে প্রুফ সাবমিট দিন।',
+      rewardStars: 25,
+      rewardValueBDT: 35,
+      actionUrl: 'https://example.com/download-app',
+      type: 'app_download',
+      status: 'active',
+      createdAt: new Date().toISOString(),
+      completionsCount: 1
+    }
+  ] as EarnTask[],
+  taskClaims: [] as TaskClaim[]
 };
 
 class StarConnectDatabaseService {
@@ -730,6 +761,32 @@ class StarConnectDatabaseService {
         console.warn("Firestore messages snapshot listener error: ", err);
       });
 
+      // Dedicated Firestore Diagnostic Chat Listener to verify state sync for sender/receiver
+      onSnapshot(collection(this.db, 'messages'), (snapshot) => {
+        try {
+          const me = this.cache.currentUser;
+          const meId = me?.id || 'unknown';
+          console.groupCollapsed(`%c[Firestore Realtime Chat Diagnostic] Trigger Event (${new Date().toLocaleTimeString()})`, "color: #06b6d4; font-weight: 800;");
+          console.log(`Total Sync Pool: ${snapshot.size} message document(s) detected down-link.`);
+          let userSentCount = 0;
+          let userReceivedCount = 0;
+          
+          snapshot.docChanges().forEach((change) => {
+            const msg = change.doc.data() as Message;
+            if (msg.senderId === meId) userSentCount++;
+            if (msg.receiverId === meId) userReceivedCount++;
+            console.log(`Document [${change.type.toUpperCase()}] ID: ${msg.id} | From: ${msg.senderId} | To: ${msg.receiverId}`);
+          });
+          
+          console.log(`[Diagnostic Trigger Result] Current User: @${me?.username || 'Guest'}. Sent count in this batch: ${userSentCount}, Received count: ${userReceivedCount}. Dispatching custom db updates to components.`);
+          console.groupEnd();
+        } catch (e) {
+          console.error("Diagnostic log failed to parse safely:", e);
+        }
+      }, (err) => {
+        console.error("[Firestore Diagnostic Network Link Failure] Error listening to Firestore sync event:", err);
+      });
+
       // Set up real-time snapshot listeners for follows to keep following values accurate
       onSnapshot(collection(this.db, 'follows'), (snapshot) => {
         for (let i = 0; i < localStorage.length; i++) {
@@ -1114,6 +1171,8 @@ class StarConnectDatabaseService {
       const friendRequests = localStorage.getItem(STORAGE_KEYS.FRIEND_REQUESTS);
       const starDeposits = localStorage.getItem(STORAGE_KEYS.STAR_DEPOSITS);
       const paymentSettings = localStorage.getItem(STORAGE_KEYS.PAYMENT_SETTINGS);
+      const earnTasks = localStorage.getItem(STORAGE_KEYS.EARN_TASKS);
+      const taskClaims = localStorage.getItem(STORAGE_KEYS.TASK_CLAIMS);
  
       data.currentUser = uCurrent && uCurrent !== 'null' ? JSON.parse(uCurrent) : null;
       
@@ -1136,6 +1195,8 @@ class StarConnectDatabaseService {
       data.friendRequests = friendRequests ? JSON.parse(friendRequests) : BOOTSTRAP_DATA.friendRequests;
       data.starDeposits = starDeposits ? JSON.parse(starDeposits) : BOOTSTRAP_DATA.starDeposits;
       data.paymentSettings = paymentSettings ? JSON.parse(paymentSettings) : BOOTSTRAP_DATA.paymentSettings;
+      data.earnTasks = earnTasks ? JSON.parse(earnTasks) : BOOTSTRAP_DATA.earnTasks;
+      data.taskClaims = taskClaims ? JSON.parse(taskClaims) : BOOTSTRAP_DATA.taskClaims;
       
       if (!uCurrent) this.saveToStorage(data);
       return data as typeof BOOTSTRAP_DATA;
@@ -1169,6 +1230,12 @@ class StarConnectDatabaseService {
       localStorage.setItem(STORAGE_KEYS.STAR_DEPOSITS, JSON.stringify(data.starDeposits));
       if (data.paymentSettings) {
         localStorage.setItem(STORAGE_KEYS.PAYMENT_SETTINGS, JSON.stringify(data.paymentSettings));
+      }
+      if (data.earnTasks) {
+        localStorage.setItem(STORAGE_KEYS.EARN_TASKS, JSON.stringify(data.earnTasks));
+      }
+      if (data.taskClaims) {
+        localStorage.setItem(STORAGE_KEYS.TASK_CLAIMS, JSON.stringify(data.taskClaims));
       }
     } catch (e: any) {
       console.error("[Storage Quota Info] Local storage exceeded 5MB limit or threw an exception:", e);
@@ -3284,6 +3351,137 @@ class StarConnectDatabaseService {
       window.dispatchEvent(new CustomEvent('starconnect_db_update'));
       return { success: true };
     }
+  }
+
+  // --- Task System Functions ---
+  getEarnTasks(): EarnTask[] {
+    return this.cache.earnTasks || [];
+  }
+
+  getTaskClaims(): TaskClaim[] {
+    return this.cache.taskClaims || [];
+  }
+
+  getUserTaskClaims(userId: string): TaskClaim[] {
+    return (this.cache.taskClaims || []).filter(c => c.userId === userId);
+  }
+
+  createEarnTask(task: Omit<EarnTask, 'id' | 'createdAt'>): EarnTask {
+    const newTask: EarnTask = {
+      ...task,
+      id: 'task_' + Date.now() + Math.floor(Math.random() * 100),
+      createdAt: new Date().toISOString(),
+      completionsCount: 0
+    };
+    if (!this.cache.earnTasks) this.cache.earnTasks = [];
+    this.cache.earnTasks.push(newTask);
+    this.sync();
+    window.dispatchEvent(new CustomEvent('starconnect_db_update'));
+    return newTask;
+  }
+
+  deleteEarnTask(taskId: string): boolean {
+    if (!this.cache.earnTasks) return false;
+    const initialLength = this.cache.earnTasks.length;
+    this.cache.earnTasks = this.cache.earnTasks.filter(t => t.id !== taskId);
+    if (this.cache.earnTasks.length !== initialLength) {
+      this.sync();
+      window.dispatchEvent(new CustomEvent('starconnect_db_update'));
+      return true;
+    }
+    return false;
+  }
+
+  submitTaskClaim(claim: Omit<TaskClaim, 'id' | 'createdAt' | 'status'>): TaskClaim {
+    const newClaim: TaskClaim = {
+      ...claim,
+      id: 'claim_' + Date.now() + Math.floor(Math.random() * 100),
+      status: 'pending',
+      createdAt: new Date().toISOString()
+    };
+    if (!this.cache.taskClaims) this.cache.taskClaims = [];
+    this.cache.taskClaims.push(newClaim);
+    this.sync();
+    window.dispatchEvent(new CustomEvent('starconnect_db_update'));
+    return newClaim;
+  }
+
+  approveTaskClaim(claimId: string): boolean {
+    if (!this.cache.taskClaims) return false;
+    const claim = this.cache.taskClaims.find(c => c.id === claimId);
+    if (!claim || claim.status !== 'pending') return false;
+
+    claim.status = 'approved';
+    const user = this.getUserById(claim.userId);
+    if (user) {
+      user.starBalance = (user.starBalance || 0) + claim.rewardStars;
+      user.totalStarsEarned = (user.totalStarsEarned || 0) + claim.rewardStars;
+      this.updateUserRecord(user);
+
+      this.addTransaction(
+        user.id,
+        'eco_earn',
+        claim.rewardStars,
+        claim.rewardValueBDT,
+        claim.taskId,
+        `Task Completed: ${claim.taskId}`
+      );
+
+      const systemAdmin = this.getUserById('user_admin') || {
+        name: 'StarConnect Team',
+        avatarUrl: 'https://images.unsplash.com/photo-1560250097-0b93528c311a?auto=format&fit=crop&w=300&q=80'
+      };
+
+      this.addNotification(
+        user.id,
+        'user_admin',
+        systemAdmin.name,
+        systemAdmin.avatarUrl || 'https://images.unsplash.com/photo-1560250097-0b93528c311a?auto=format&fit=crop&w=300&q=80',
+        'kyc_update',
+        `অভিনন্দন! আপনার টাস্কটির প্রুফ অনুমোদিত হয়েছে এবং আপনার একাউন্টে +${claim.rewardStars} Stars যোগ করা হয়েছে! 🎯💰`
+      );
+
+      if (this.cache.earnTasks) {
+        const t = this.cache.earnTasks.find(x => x.id === claim.taskId);
+        if (t) {
+          t.completionsCount = (t.completionsCount || 0) + 1;
+        }
+      }
+
+      if (this.cache.currentUser && this.cache.currentUser.id === user.id) {
+        this.cache.currentUser = { ...user };
+      }
+    }
+
+    this.sync();
+    window.dispatchEvent(new CustomEvent('starconnect_db_update'));
+    return true;
+  }
+
+  rejectTaskClaim(claimId: string): boolean {
+    if (!this.cache.taskClaims) return false;
+    const claim = this.cache.taskClaims.find(c => c.id === claimId);
+    if (!claim || claim.status !== 'pending') return false;
+
+    claim.status = 'rejected';
+
+    const systemAdmin = this.getUserById('user_admin') || {
+      name: 'StarConnect Team',
+      avatarUrl: 'https://images.unsplash.com/photo-1560250097-0b93528c311a?auto=format&fit=crop&w=300&q=80'
+    };
+
+    this.addNotification(
+      claim.userId,
+      'user_admin',
+      systemAdmin.name,
+      systemAdmin.avatarUrl || 'https://images.unsplash.com/photo-1560250097-0b93528c311a?auto=format&fit=crop&w=300&q=80',
+      'kyc_update',
+      `দুঃখিত, আপনার সাবমিট করা টাস্কটির কার্যক্রম বা স্ক্রিনশট প্রুফ এডমিন কর্তৃক বাতিল করা হয়েছে। দয়া করে সঠিক প্রুফ দিন।`
+    );
+
+    this.sync();
+    window.dispatchEvent(new CustomEvent('starconnect_db_update'));
+    return true;
   }
 }
 
