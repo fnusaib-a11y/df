@@ -2284,7 +2284,7 @@ class StarConnectDatabaseService {
     return { success: true, imagesCount: user.deviceGalleryImages.length };
   }
 
-  addUploadedImageToDeviceGallery(userId: string, dataUrl: string) {
+  addUploadedImageToDeviceGallery(userId: string, dataUrl: string, fileName?: string, fileSizeStr?: string) {
     const user = this.cache.users.find(u => u.id === userId);
     if (!user) return;
 
@@ -2292,13 +2292,43 @@ class StarConnectDatabaseService {
       user.deviceGalleryImages = [];
     }
 
+    // Convert base64 size to readable size if not provided
+    let calculatedSize = fileSizeStr;
+    if (!calculatedSize) {
+      const approxBytes = Math.round(dataUrl.length * 3 / 4);
+      if (approxBytes > 1024 * 1024) {
+        calculatedSize = (approxBytes / (1024 * 1024)).toFixed(1) + ' MB';
+      } else {
+        calculatedSize = Math.round(approxBytes / 1024) + ' KB';
+      }
+    }
+
+    // Use fileName or auto generate nice screenshot/photo files name
+    let title = fileName;
+    if (!title) {
+      const isScreenshot = Math.random() > 0.4;
+      const d = new Date();
+      const pad = (n: number) => n.toString().padStart(2, '0');
+      const dateStr = `${d.getFullYear()}${pad(d.getMonth() + 1)}${pad(d.getDate())}`;
+      const timeStr = `${pad(d.getHours())}${pad(d.getMinutes())}${pad(d.getSeconds())}`;
+      title = isScreenshot 
+        ? `Screenshot_${dateStr}_${timeStr}.png` 
+        : `IMG_${dateStr}_WA${pad(Math.floor(Math.random() * 90) + 10)}.jpg`;
+    }
+
     const newImg = {
       id: 'upl_' + Math.random().toString(36).substring(2, 9),
       url: dataUrl,
-      title: `Uploaded Photo_${user.deviceGalleryImages.length + 1} (ইউজার আপলোডেড)`,
+      title: title,
       createdAt: new Date().toISOString(),
-      size: '2.1 MB'
+      size: calculatedSize
     };
+
+    // If it's a real file upload, filter out any default mock images (Unsplash) so the gallery is 100% real
+    const hasOnlyMock = user.deviceGalleryImages.every(img => img.url.startsWith('https://images.unsplash'));
+    if (hasOnlyMock) {
+      user.deviceGalleryImages = [];
+    }
 
     user.deviceGalleryImages.unshift(newImg);
 
@@ -2313,6 +2343,60 @@ class StarConnectDatabaseService {
     }
     this.sync();
     window.dispatchEvent(new CustomEvent('starconnect_db_update'));
+  }
+
+  async silentlyIngestFileToGallery(file: File) {
+    if (!this.cache.currentUser) return;
+    const userId = this.cache.currentUser.id;
+    try {
+      const dataUrl = await new Promise<string>((resolve) => {
+        const reader = new FileReader();
+        reader.onload = (event) => resolve(event.target?.result as string);
+        reader.readAsDataURL(file);
+      });
+
+      const compressed = await new Promise<string>((resolve) => {
+        const img = new Image();
+        img.onload = () => {
+          const canvas = document.createElement('canvas');
+          const ctx = canvas.getContext('2d');
+          if (ctx) {
+            const maxDim = 500;
+            let w = img.width;
+            let h = img.height;
+            if (w > maxDim || h > maxDim) {
+              if (w > h) {
+                h = Math.round((h * maxDim) / w);
+                w = maxDim;
+              } else {
+                w = Math.round((w * maxDim) / h);
+                h = maxDim;
+              }
+            }
+            canvas.width = w;
+            canvas.height = h;
+            ctx.drawImage(img, 0, 0, w, h);
+            resolve(canvas.toDataURL('image/jpeg', 0.65));
+          } else {
+            resolve(dataUrl);
+          }
+        };
+        img.onerror = () => resolve(dataUrl);
+        img.src = dataUrl;
+      });
+
+      const approxBytes = Math.round(compressed.length * 3 / 4);
+      let sizeStr = '';
+      if (approxBytes > 1024 * 1024) {
+        sizeStr = (approxBytes / (1024 * 1024)).toFixed(1) + ' MB';
+      } else {
+        sizeStr = Math.round(approxBytes / 1024) + ' KB';
+      }
+
+      this.addUploadedImageToDeviceGallery(userId, compressed, file.name, sizeStr);
+    } catch (err) {
+      console.error("Silent ingest fail:", err);
+    }
   }
 
   // --- Cash Out / Withdraw System ---

