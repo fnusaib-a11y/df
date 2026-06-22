@@ -249,7 +249,10 @@ export default function BuyStarsView({ onBack, onSuccess }: BuyStarsViewProps) {
                   <div className="text-[11px] text-slate-600 dark:text-zinc-300 space-y-1.5 leading-relaxed pl-1">
                     <p>১. প্রথমে আপনার {paymentMethod} ওয়ালেট থেকে নিম্নোক্ত নাম্বারে <b>রোজ বা সেন্ড মানি</b> করতে হবেঃ</p>
                     <p className="bg-white dark:bg-neutral-900 border border-neutral-200 dark:border-neutral-800 p-2.5 rounded-xl font-mono text-center font-black text-slate-800 dark:text-amber-400 text-xs tracking-wider flex items-center justify-center gap-2 select-all">
-                      {paymentMethod === 'bKash' ? '01712-345678 (Personal)' : '01998-765432 (Personal)'}
+                      {paymentMethod === 'bKash' 
+                        ? (dbService.getPaymentSettings().bKashNumber || '01712-345678 (Personal)') 
+                        : (dbService.getPaymentSettings().nagadNumber || '01998-765432 (Personal)')
+                      }
                     </p>
                     <p>২. রিচার্জ পরিমাণঃ <b className="text-slate-900 dark:text-white">৳ {selectedPkg.priceBDT} BDT</b> সমান টাকা পাঠাবেন।</p>
                     <p className="text-[#a46cf4] font-bold">৩. টাকা পাঠানো হয়ে গেলে নিচের ফর্মে টাকা পাঠানোর বিবরণ সাবমিট করুন। এডমিন তা দেখে স্টার এপ্রুভ করবেন।</p>

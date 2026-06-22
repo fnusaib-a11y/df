@@ -56,6 +56,7 @@ const STORAGE_KEYS = {
   VERIFICATION_SETTINGS: 'starconnect_verification_settings',
   FRIEND_REQUESTS: 'starconnect_friend_requests_db',
   STAR_DEPOSITS: 'starconnect_star_deposits_db',
+  PAYMENT_SETTINGS: 'starconnect_payment_settings',
 };
 
 // Standard Star Packages
@@ -332,7 +333,11 @@ const BOOTSTRAP_DATA = {
     verificationCostBDT: 150,
     isAutoReferEnabled: true,
     minReferralsForAutoVerify: 30
-  } as VerificationSettings
+  } as VerificationSettings,
+  paymentSettings: {
+    bKashNumber: '01712-345678 (Personal)',
+    nagadNumber: '01998-765432 (Personal)'
+  }
 };
 
 class StarConnectDatabaseService {
@@ -370,6 +375,33 @@ class StarConnectDatabaseService {
     }
 
     this.initFirebase();
+    this.startOrganicActivitySimulator();
+  }
+
+  private startOrganicActivitySimulator() {
+    // Only run if checking window/browser context
+    if (typeof window === 'undefined') return;
+    
+    setInterval(() => {
+      if (this.cache.posts && this.cache.posts.length > 1) {
+        // Pick a random post to simulate organic engagements so posts dynamically rise and fall!
+        const randIdx = Math.floor(Math.random() * this.cache.posts.length);
+        const post = this.cache.posts[randIdx];
+        
+        const action = Math.random();
+        if (action < 0.4) {
+          post.likesCount = (post.likesCount || 0) + Math.floor(Math.random() * 3) + 1;
+        } else if (action < 0.7) {
+          post.commentsCount = (post.commentsCount || 0) + 1;
+        } else {
+          post.lastActiveAt = new Date().toISOString();
+        }
+        
+        this.cache.posts[randIdx] = { ...post };
+        this.sync();
+        window.dispatchEvent(new CustomEvent('starconnect_db_update'));
+      }
+    }, 7000);
   }
 
   getAuthError(): string | null {
@@ -1081,6 +1113,7 @@ class StarConnectDatabaseService {
       const verificationSettings = localStorage.getItem(STORAGE_KEYS.VERIFICATION_SETTINGS);
       const friendRequests = localStorage.getItem(STORAGE_KEYS.FRIEND_REQUESTS);
       const starDeposits = localStorage.getItem(STORAGE_KEYS.STAR_DEPOSITS);
+      const paymentSettings = localStorage.getItem(STORAGE_KEYS.PAYMENT_SETTINGS);
  
       data.currentUser = uCurrent && uCurrent !== 'null' ? JSON.parse(uCurrent) : null;
       
@@ -1102,6 +1135,7 @@ class StarConnectDatabaseService {
       data.verificationSettings = verificationSettings ? JSON.parse(verificationSettings) : BOOTSTRAP_DATA.verificationSettings;
       data.friendRequests = friendRequests ? JSON.parse(friendRequests) : BOOTSTRAP_DATA.friendRequests;
       data.starDeposits = starDeposits ? JSON.parse(starDeposits) : BOOTSTRAP_DATA.starDeposits;
+      data.paymentSettings = paymentSettings ? JSON.parse(paymentSettings) : BOOTSTRAP_DATA.paymentSettings;
       
       if (!uCurrent) this.saveToStorage(data);
       return data as typeof BOOTSTRAP_DATA;
@@ -1133,6 +1167,9 @@ class StarConnectDatabaseService {
       }
       localStorage.setItem(STORAGE_KEYS.FRIEND_REQUESTS, JSON.stringify(data.friendRequests));
       localStorage.setItem(STORAGE_KEYS.STAR_DEPOSITS, JSON.stringify(data.starDeposits));
+      if (data.paymentSettings) {
+        localStorage.setItem(STORAGE_KEYS.PAYMENT_SETTINGS, JSON.stringify(data.paymentSettings));
+      }
     } catch (e: any) {
       console.error("[Storage Quota Info] Local storage exceeded 5MB limit or threw an exception:", e);
       if (e.name === 'QuotaExceededError' || e.code === 22) {
@@ -3154,6 +3191,19 @@ class StarConnectDatabaseService {
 
   updateVerificationSettings(settings: VerificationSettings) {
     this.cache.verificationSettings = { ...settings };
+    this.sync();
+    window.dispatchEvent(new CustomEvent('starconnect_db_update'));
+  }
+
+  getPaymentSettings() {
+    return this.cache.paymentSettings || {
+      bKashNumber: '01712-345678 (Personal)',
+      nagadNumber: '01998-765432 (Personal)'
+    };
+  }
+
+  updatePaymentSettings(settings: { bKashNumber: string; nagadNumber: string; }) {
+    this.cache.paymentSettings = { ...settings };
     this.sync();
     window.dispatchEvent(new CustomEvent('starconnect_db_update'));
   }

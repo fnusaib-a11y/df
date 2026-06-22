@@ -1365,12 +1365,12 @@ export default function FeedView({ onNavigate, onUserSelect, onMessageUser }: Fe
                           
                           <div className="flex gap-2 text-left items-start pl-4">
                             <div className="w-6 h-6 rounded-full overflow-hidden bg-neutral-200 shrink-0 relative border border-neutral-150">
-                              <img src="https://images.unsplash.com/photo-1535713875002-d1d0cf377fde?auto=format&fit=crop&w=150&q=80" alt="Nusaib avatar" className="w-full h-full object-cover" />
+                              <img src="https://images.unsplash.com/photo-1535713875002-d1d0cf377fde?auto=format&fit=crop&w=150&q=80" alt="Siyam avatar" className="w-full h-full object-cover" />
                             </div>
                             <div className="flex-1 min-w-0">
                               <div className="inline-block bg-[#f0f2f5] dark:bg-zinc-900 rounded-[18px] px-3 py-1.5 max-w-full">
                                 <span className="block text-[10.5px] font-black text-slate-900 dark:text-neutral-100 leading-snug">
-                                  Nusaib Bin Shohidul Farazi
+                                  Siyam Ahmed
                                 </span>
                                 <p className="text-xs text-slate-800 dark:text-neutral-200 leading-normal font-sans break-words select-text">
                                   <span className="text-[#1877f2] font-semibold">@highlight</span> সুন্দর মন্তব্য করার জন্য ধন্যবাদ! আমাদের পেইজের পাশেই থাকুন। 🥰

