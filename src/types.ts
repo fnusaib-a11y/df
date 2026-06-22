@@ -128,6 +128,7 @@ export interface Comment {
   authorAvatarUrl: string;
   content: string;
   createdAt: string;
+  attachmentUrl?: string;
 }
 
 export interface Chat {

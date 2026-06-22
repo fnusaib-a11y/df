@@ -2016,7 +2016,7 @@ class StarConnectDatabaseService {
     return post;
   }
 
-  addComment(postId: string, content: string): Comment {
+  addComment(postId: string, content: string, attachmentUrl?: string): Comment {
     const me = this.cache.currentUser;
     const cid = 'c_' + Math.random().toString(36).substr(2, 9);
     const newComment: Comment = {
@@ -2026,7 +2026,8 @@ class StarConnectDatabaseService {
       authorName: me.name,
       authorAvatarUrl: me.avatarUrl,
       content,
-      createdAt: new Date().toISOString()
+      createdAt: new Date().toISOString(),
+      ...(attachmentUrl ? { attachmentUrl } : {})
     };
 
     this.cache.comments.push(newComment);
@@ -2850,6 +2851,16 @@ class StarConnectDatabaseService {
   getPostReachWeight(post: Post): number {
     if (post.boostUntil) {
       if (new Date(post.boostUntil).getTime() < Date.now()) {
+        if (post.reachWeight !== 0) {
+          post.reachWeight = 0;
+          setTimeout(() => {
+            this.sync();
+            if (this.isFirebaseReady && this.db) {
+              setDoc(doc(this.db, 'posts', post.id), this.cleanForFirestore(post)).catch(console.warn);
+            }
+            window.dispatchEvent(new CustomEvent('starconnect_db_update'));
+          }, 50);
+        }
         return 0; // expired, falls back to normal
       }
     }
