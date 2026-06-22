@@ -2896,6 +2896,9 @@ class StarConnectDatabaseService {
 
   deletePost(postId: string) {
     this.cache.posts = this.cache.posts.filter(p => p.id !== postId);
+    if (this.isFirebaseReady && this.db) {
+      deleteDoc(doc(this.db, 'posts', postId)).catch(console.warn);
+    }
     this.sync();
     window.dispatchEvent(new CustomEvent('starconnect_db_update'));
   }

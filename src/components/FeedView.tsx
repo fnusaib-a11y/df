@@ -43,6 +43,27 @@ const safeFormatDateTimeString = (dateStr?: string) => {
   }
 };
 
+const FEED_GRADIENTS: Record<string, string> = {
+  sunset: 'bg-gradient-to-r from-amber-500 via-orange-500 to-rose-500 text-white',
+  ocean: 'bg-gradient-to-r from-cyan-500 via-blue-500 to-indigo-500 text-white',
+  cosmic: 'bg-gradient-to-tr from-purple-600 via-pink-500 to-amber-500 text-white',
+  neon: 'bg-gradient-to-r from-emerald-400 via-blue-500 to-purple-600 text-white',
+  love: 'bg-gradient-to-r from-red-500 to-pink-500 text-white',
+  aurora: 'bg-gradient-to-r from-green-400 via-cyan-500 to-blue-500 text-white'
+};
+
+const parsePostContent = (content: string) => {
+  if (content && content.startsWith('[GRADIENT:')) {
+    const endIdx = content.indexOf(']');
+    if (endIdx !== -1) {
+      const gradientId = content.substring(10, endIdx);
+      const cleanContent = content.substring(endIdx + 1);
+      return { gradientId, cleanContent };
+    }
+  }
+  return { gradientId: null, cleanContent: content };
+};
+
 interface FeedViewProps {
   onNavigate: (screen: string) => void;
   onUserSelect?: (userId: string) => void;
@@ -865,14 +886,33 @@ export default function FeedView({ onNavigate, onUserSelect, onMessageUser }: Fe
                 </div>
 
                 {/* Content description title text */}
-                <div className="space-y-1 pr-1.5 text-left">
-                  {post.title && (
-                    <h3 className="text-xs font-extrabold text-slate-850 dark:text-white">{post.title}</h3>
-                  )}
-                  <p className="text-xs text-slate-700 dark:text-neutral-250 whitespace-pre-wrap leading-relaxed font-sans font-medium">
-                    {post.content}
-                  </p>
-                </div>
+                {(() => {
+                  const parsed = parsePostContent(post.content);
+                  if (parsed.gradientId) {
+                    const bgClass = FEED_GRADIENTS[parsed.gradientId] || 'bg-gradient-to-r from-amber-500 via-orange-500 to-rose-500 text-white';
+                    return (
+                      <div className={`w-full min-h-[160px] flex flex-col items-center justify-center p-6 text-center rounded-2xl shadow-inner font-display select-text mb-3 ${bgClass}`}>
+                        {post.title && (
+                          <h3 className="text-sm font-black tracking-wide mb-1 opacity-90">{post.title}</h3>
+                        )}
+                        <p className="text-sm font-black tracking-wide whitespace-pre-wrap leading-relaxed select-text">
+                          {parsed.cleanContent}
+                        </p>
+                      </div>
+                    );
+                  } else {
+                    return (
+                      <div className="space-y-1 pr-1.5 text-left mb-3">
+                        {post.title && (
+                          <h3 className="text-xs font-extrabold text-slate-850 dark:text-white">{post.title}</h3>
+                        )}
+                        <p className="text-xs text-slate-700 dark:text-neutral-250 whitespace-pre-wrap leading-relaxed font-sans font-medium">
+                          {post.content}
+                        </p>
+                      </div>
+                    );
+                  }
+                })()}
 
                 {/* Shared Post Container Reference */}
                 {post.sharedPostId && (
@@ -1382,6 +1422,29 @@ export default function FeedView({ onNavigate, onUserSelect, onMessageUser }: Fe
                 <ShieldAlert className="w-5 h-5 text-neutral-450" />
                 <span>Block this creator directly (Block Creator)</span>
               </button>
+
+              {/* Delete post option (Own post OR Admin power) */}
+              {(selectedPostOptions.authorId === myProfile?.id || myProfile?.role === 'admin' || myProfile?.id === 'user_admin') && (
+                <button
+                  onClick={() => {
+                    if (window.confirm('আপনি কি নিশ্চিত যে এই পোস্টটি ডিলিট করতে চান? (Are you sure you want to delete this post?)')) {
+                      dbService.deletePost(selectedPostOptions.id);
+                      alert('🎉 পোস্টটি সফলভাবে ডিলিট করা হয়েছে! (Post deleted successfully!)');
+                      setSelectedPostOptions(null);
+                      loadFeedData();
+                    }
+                  }}
+                  className="w-full flex items-center gap-3 p-3 text-left bg-rose-50/70 hover:bg-rose-100 dark:bg-rose-950/20 dark:hover:bg-rose-900/40 border border-rose-200/40 rounded-xl text-rose-600 dark:text-rose-450 font-extrabold cursor-pointer"
+                >
+                  <AlertCircle className="w-5 h-5 text-rose-500 shrink-0" />
+                  <div className="flex flex-col text-left">
+                    <span className="text-xs font-black">পোস্ট মুছে ফেলুন (Delete Post)</span>
+                    <span className="text-[10px] text-rose-400 font-semibold mt-0.5 leading-none">
+                      {selectedPostOptions.authorId === myProfile?.id ? 'নিজের পোস্ট ডিলিট করুন' : 'এডমিন ক্ষমতা দ্বারা ডিলিট করুন'}
+                    </span>
+                  </div>
+                </button>
+              )}
             </div>
           ) : (
             <div className="space-y-3 pt-1">

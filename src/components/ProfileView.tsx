@@ -35,6 +35,27 @@ const PRESET_COVERS = [
   { name: '🌆 Neon', url: 'https://images.unsplash.com/photo-1513542789411-b6a5d4f31634?auto=format&fit=crop&w=800&q=80' }
 ];
 
+const PROFILE_GRADIENTS: Record<string, string> = {
+  sunset: 'bg-gradient-to-r from-amber-500 via-orange-500 to-rose-500 text-white',
+  ocean: 'bg-gradient-to-r from-cyan-500 via-blue-500 to-indigo-500 text-white',
+  cosmic: 'bg-gradient-to-tr from-purple-600 via-pink-500 to-amber-500 text-white',
+  neon: 'bg-gradient-to-r from-emerald-400 via-blue-500 to-purple-600 text-white',
+  love: 'bg-gradient-to-r from-red-500 to-pink-500 text-white',
+  aurora: 'bg-gradient-to-r from-green-400 via-cyan-500 to-blue-500 text-white'
+};
+
+const parsePostContentForProfile = (content: string) => {
+  if (content && content.startsWith('[GRADIENT:')) {
+    const endIdx = content.indexOf(']');
+    if (endIdx !== -1) {
+      const gradientId = content.substring(10, endIdx);
+      const cleanContent = content.substring(endIdx + 1);
+      return { gradientId, cleanContent };
+    }
+  }
+  return { gradientId: null, cleanContent: content };
+};
+
 export default function ProfileView({ onNavigate, onEditProfile, editProfileOpen, onEditProfileClose, onPostSelect, onChatWithUser, userId }: ProfileViewProps) {
   const loggedInUser = dbService.getCurrentUser();
   const isOwnProfile = !userId || userId === loggedInUser?.id;
@@ -453,11 +474,15 @@ export default function ProfileView({ onNavigate, onEditProfile, editProfileOpen
                   </div>
                 )}
 
-                {!post.mediaUrl && (
-                  <div className="w-full h-full p-3 bg-gradient-to-tr from-amber-500 to-amber-600 text-white flex items-center justify-center text-center text-xs font-medium">
-                    <p className="line-clamp-4">{post.content}</p>
-                  </div>
-                )}
+                {!post.mediaUrl && (() => {
+                  const parsed = parsePostContentForProfile(post.content);
+                  const bgClass = parsed.gradientId ? (PROFILE_GRADIENTS[parsed.gradientId] || 'bg-gradient-to-tr from-amber-500 to-amber-600') : 'bg-gradient-to-tr from-amber-500 to-amber-600';
+                  return (
+                    <div className={`w-full h-full p-3 ${bgClass} text-white flex items-center justify-center text-center text-xs font-semibold`}>
+                      <p className="line-clamp-4 leading-normal">{parsed.cleanContent}</p>
+                    </div>
+                  );
+                })()}
               </div>
             ))}
           </div>
